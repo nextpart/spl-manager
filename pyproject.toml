@@ -1,0 +1,87 @@
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.nitpick]
+style = [
+  "https://res.gen.nxtp/files/codestyle/styles/nitpick-generic.toml",
+  "https://res.gen.nxtp/files/codestyle/styles/nitpick-python.toml",
+  "https://res.gen.nxtp/files/codestyle/styles/nitpick-pypackage.toml",
+]
+cache = "never"
+
+[tool.poetry]
+name = "spl"
+version = "0.1.0"
+description = ""
+readme = 'README.md'
+authors = ["Nextpart Security Intelligence <info@nextpart.io>"]
+
+[tool.poetry.dependencies]
+python = "^3.8"
+splunk-sdk = "^1.6.18"
+splunk-appinspect = "^2.11.0"
+rich = "^10.16.1"
+docker = "^5.0.3"
+inquirer = "^2.8.0"
+fire = "^0.4.0"
+dynaconf = "^3.1.7"
+inquirerpy = "^0.3.1"
+Cerberus = "^1.3.4"
+deepdiff = "^5.7.0"
+requests-toolbelt = "^0.9.1"
+
+
+[tool.poetry.dev-dependencies]
+black = "^21.12b0"
+ipykernel = "^6.6.0"
+tox = "^3.24.4"
+pylint = "^2.12.2"
+
+
+[tool.black]
+include = "\\.pyi?$"
+line-length = 100
+
+[tool.coverage]
+[tool.coverage.report]
+exclude_lines = ["pragma: no cover", "def __repr__", "if self\\.debug", "raise AssertionError", "raise NotImplementedError", "if 0:", "if __name__ == .__main__.:"]
+ignore_errors = true
+omit = ["*/site-packages/*", "*/.venv/*", "*/.tox/*", "*/.local/*", "*/tests/*"]
+
+[tool.coverage.run]
+branch = true
+
+[tool.isort]
+line_length = 100
+multi_line_output = 3
+profile = "black"
+
+[tool.pytest]
+[tool.pytest.ini_options]
+addopts = "-ra -q --doctest-modules"
+junit_family = "xunit2"
+minversion = "6.0"
+norecursedirs = ["**/.svn", "**/_build", "**/tmp*", "**/.tox", "**/venv", "**/docs", "**/junit", "**/tests"]
+testpaths = ["tests"]
+
+[tool.mypy]
+allow_redefinition = true
+check_untyped_defs = true
+disallow_any_generics = false
+disallow_incomplete_defs = false
+disallow_subclassing_any = true
+disallow_untyped_calls = false
+ignore_missing_imports = false
+install_types = true
+local_partial_types = true
+namespace_packages = true
+no_implicit_optional = false
+non_interactive = true
+show_error_codes = true
+strict_equality = true
+warn_redundant_casts = true
+warn_return_any = true
+warn_unused_configs = true
+warn_unused_ignores = true
