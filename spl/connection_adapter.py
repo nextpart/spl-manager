@@ -1,9 +1,17 @@
 # -*- coding: utf-8 -*-
+from datetime import datetime
+
 import splunklib.binding as spl_context
 import splunklib.client as spl_client
 from InquirerPy import inquirer
-from rich import print  # pylint: disable=W0622
+from rich import inspect, print  # pylint: disable=W0622
+from rich.console import Console
 from rich.progress import track
+from rich.table import Column, Table
+
+from spl.objects import Apps, Indexes, Roles, Users
+
+TIME_FORMAT = "%d.%m.%Y %H:%M:%S"
 
 
 class ConnectionAdapter:
@@ -15,59 +23,56 @@ class ConnectionAdapter:
 
     spl: spl_client.Service
 
-    def __init__(self, parent: object, name: str, sharing="system"):
+    def __init__(
+        self, parent: object, name: str, app: str = "system", sharing="system", owner="admin"
+    ):
         self._name = name
         self._interactive = parent._interactive
         self._log = parent._log
-        self._settings = parent._settings.CONNECTIONS[name]
-        self._log.debug(f"Creating resource management interface for {name}.")
+        self._settings = parent._settings
         self.client: spl_client.Service = spl_client.connect(
-            host=self._settings["host"],
-            port=self._settings["port"],
-            username=self._settings["username"],
-            password=self._settings["password"],
+            host=self._settings.CONNECTIONS[name]["host"],
+            port=self._settings.CONNECTIONS[name]["port"],
+            username=self._settings.CONNECTIONS[name]["username"],
+            password=self._settings.CONNECTIONS[name]["password"],
             sharing=sharing,
         )
+        self._log.info(
+            f"Connection adapter for '{self._name}' ({self.client.authority})"
+            + f" as user '{self.client.username}' with namespace: {self.client.namespace}."
+        )
 
-    def custom_apps(self):
-        """Provide list of custom (non-default) apps, installed on an instance."""
-        for app in track(self.client.apps.list()):
-            if app.name in self._settings.APPS.exclude:
-                continue
-            print(f" - Id:       '{app.name}'")
-            if "author" in app.content:
-                print(f"   Author:   {app.content['author']}")
-            # if "description" in app.content.keys():
-            #     print(f"   Author:   {app.content['description']}")
-            if "label" in app.content:
-                print(f"   Label:    {app.content['label']}")
-            if "version" in app.content:
-                print(f"   Version:  {app.content['version']}")
-            print(
-                "   State:    "
-                + ("disabled" if app.content["disabled"] == "1" else "enabled")
-                + "/"
-                + ("visible" if app.content["visible"] == "1" else "hidden")
-            )
-            print("")
-
-    def indexes(self):
-        for index in self.client.indexes.list():
-            print(f"- {index.name}")
-
-    def users(self):
-        for user in self.client.users.list():
-            print(f"- {user.name}")
-
+    @property
     def roles(self):
-        for role in self.client.roles.list():
-            print(f"- {role.name}: {role.content['capabilities']}")
+        return Roles(self.client, interactive=self._interactive)
+
+    @property
+    def users(self):
+        return Users(self.client, interactive=self._interactive)
+
+    @property
+    def apps(self):
+        return Apps(self.client, interactive=self._interactive)
+
+    @property
+    def indexes(self):
+        return Indexes(self.client, interactive=self._interactive)
 
     def __str__(self):
-        return f"Connection adapter for '{self._name}'."
+        self._log.info(f"Connection user {self.client.username}")
+        return (
+            f"Connection adapter for '{self._name}' ({self.client.authority})"
+            + f" as user '{self.client.username}'."
+        )
 
     def test(self):
         return "test"
+
+    def restart(self):
+        if self._name in ["localhost", "nxtp-onprem"]:
+            self._log.info("Restarting instance...")
+            self.client.restart(timeout=360)
+            self._log.info("Up again.")
 
     def namespace(self, app=None, sharing=None, owner=None):
         """Namespace context for splunk interaction.
@@ -89,10 +94,10 @@ class ConnectionAdapter:
             self.app = inquirer.select(
                 message="Select an application context:",
                 choices=[app.name for app in self.client.apps.list()],
-                default="search",
+                default="system",
             ).execute()
         elif app is None:
-            self.app = "search"
+            self.app = "system"
         elif app not in [app.name for app in self.client.apps.list()]:
             raise ValueError(f"Application '{app}' does not exist")
 
@@ -125,42 +130,60 @@ class ConnectionAdapter:
         )
         return self.client.namespace
 
-    @property
-    def index_names(self):
-        return [index.name for index in self.client.indexes.list()]
+    # def create_index(self, name: str = None, app=None, sharing=None, owner=None):
+    #     if name is None:
+    #         name = inquirer.text(message="Name of the index to create:").execute()
+    #     self.client.indexes.create(
+    #         name=name, namespace=self.namespace(app=app, sharing=sharing, owner=owner)
+    #     )
 
-    @property
-    def user_names(self):
-        return [user.name for user in self.client.users.list()]
+    # def create_role(self, role):
+    #     args = {
+    #         field: role.content[field]
+    #         for field in role.fields["optional"]
+    #         if field in role.content
+    #         and role.content[field] is not None
+    #         and role.content[field] != "-1"
+    #         and field
+    #         not in [
+    #             "capabilities",
+    #         ]
+    #     }
+    #     args["capabilities"] = []
+    #     for capability in role.capabilities:
+    #         if capability in self.client.capabilities:
+    #             args["capabilities"].append(capability)
+    #         else:
+    #             self._log.warning(
+    #                 f"The role {role.name} has an unknown capability {capability}"
+    #                 + " assignes. We'll skip this assignment. You can sync later on."
+    #             )
+    #     try:
+    #         self.client.roles.create(name=role.name, **args)
+    #     except spl_context.HTTPError as error:
+    #         self._log.error(error)
 
-    @property
-    def app_names(self):
-        return [app.name for app in self.client.apps.list()]
-
-    @property
-    def role_names(self):
-        return list(role.name for role in self.client.roles.list()).sort()
-
-    def create_index(self, name: str = None, app=None, sharing=None, owner=None):
-        if name is None:
-            name = inquirer.text(message="Name of the index to create:").execute()
-        self.client.indexes.create(
-            name=name, namespace=self.namespace(app=app, sharing=sharing, owner=owner)
-        )
-
-    def create_role(self, role):
-        self._log.warning(f"Creating role : {role.content}")
-        args = {
-            field: role.content[field]
-            for field in role.fields["optional"]
-            if field in role.content
-            and role.content[field] is not None
-            and field
-            not in [
-                "srchTimeEarliest",
-            ]
-        }
-        try:
-            self.client.roles.create(name=role.name, **args)
-        except spl_context.HTTPError as error:
-            self._log.error(error)
+    # def update_role(self, **kwargs):
+    #     print(kwargs)
+    # args = {
+    #     field: role.content[field]
+    #     for field in role.fields["optional"]
+    #     if field in role.content
+    #     and role.content[field] is not None
+    #     and role.content[field] != "-1"
+    #     and field
+    #     not in [
+    #         "capabilities",
+    #     ]
+    # }
+    # args["capabilities"] = []
+    # for capability in role.capabilities:
+    #     if capability in self.client.capabilities:
+    #         args["capabilities"].append(capability)
+    #     else:
+    #         self._log.warning(f"The role {role.name} has an unknown capability {capability}"
+    #         + " assignes. We'll skip this assignment. You can sync later on.")
+    # try:
+    #     self.client.roles.create(name=role.name, **args)
+    # except spl_context.HTTPError as error:
+    #     self._log.error(error)

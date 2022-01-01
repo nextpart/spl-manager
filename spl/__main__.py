@@ -36,7 +36,6 @@ class SplManager:
                 Defaults to None.
         """
         self._interactive = interactive
-        print(level)
         logging.basicConfig(
             level=level, format="%(message)s", datefmt="[%X]", handlers=[RichHandler()]
         )
@@ -91,7 +90,7 @@ class SplManager:
         # if self._src is None: raise ValueError(f"Source required")
         return SamplesManager(self, path=Path(path))
 
-    def apps(self, path: Union[Path, str] = Path.cwd(), name: str = None) -> AppsManager:
+    def apps(self, path: Union[Path, str] = Path.cwd(), name: str = "None") -> AppsManager:
         """Local residing application management.
 
         Apps abstracts the handling of local application folders at a given `--path` and

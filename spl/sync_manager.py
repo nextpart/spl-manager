@@ -9,6 +9,7 @@ from InquirerPy import inquirer
 from rich import inspect, print  # pylint: disable=W0622
 
 from spl.connection_adapter import ConnectionAdapter
+from spl.objects import Apps, Indexes, Roles, Users
 
 
 class SyncManager:
@@ -25,72 +26,62 @@ class SyncManager:
         self.dest = dest
         self._log.level = logging.DEBUG
 
-    @staticmethod
-    def user_diff(src: ConnectionAdapter, dest: ConnectionAdapter) -> object:
-        return DeepDiff(
-            {user.name: user.content for user in src.client.users.list()},
-            {user.name: user.content for user in dest.client.users.list()},
-            ignore_order=True,
-        )
-
-    @staticmethod
-    def role_diff(src: ConnectionAdapter, dest: ConnectionAdapter) -> object:
-        return DeepDiff(
-            {role.name: role.content for role in src.client.roles.list()},
-            {role.name: role.content for role in dest.client.roles.list()},
-            ignore_order=True,
-        )
-
-    def create_role(self, role_name):
-        self._log.info(
-            f"Creating new role '{role_name}' based on '{self.src._name}' on instance '{self.dest._name}'."
-        )
-        self.dest.create_role(self.src.client.roles[role_name])
-
     def roles(self, simulate: bool = False):
+        print(Roles.diff(self.src, self.dest))
         handler = self.DiffHandler(
             parent=self,
+            diff=Roles.diff,
+            accessor=self.src.client.roles,
             subject=spl_client.Role,
             simulate=simulate,
-            diff=self.role_diff,
             actions={
-                "create": self.create_role,
-                "srchTimeEarliest": None,
-                "srchIndexesDefault": None,
-                "imported_srchIndexesDefault": None
+                "create": self.dest.roles.create,
+                "*": self.dest.roles.update,
+                # "content.srchIndexesDefault": self.dest.roles.update,
                 # "remove": None,
             },
         ).sync()  # diff=self.user_diff)
 
-    @staticmethod
-    def user_diff(src, dest):
-        return DeepDiff(
-            {user.name: user.content for user in src.client.users.list()},
-            {user.name: user.content for user in dest.client.users.list()},
-            ignore_order=True,
-        )
-
     def users(self, simulate: bool = False):
         handler = self.DiffHandler(
             parent=self,
+            diff=Users.diff,
             subject=spl_client.User,
+            accessor=self.src.client.users,
             simulate=simulate,
-            diff=self.user_diff,
             actions={
-                "create": None,
-                "remove": None,
-                "capabilities": None,
-                "perm.read": None,
+                "create": self.dest.users.create,
+                "remove": self.dest.users.update,
+                "capabilities": self.dest.users.update,
+                "perm.read": self.dest.users.update,
             },
         ).sync()  # diff=self.user_diff)
 
+    def apps(self, simulate: bool = False):
+        handler = self.DiffHandler(
+            parent=self,
+            diff=Apps.diff,
+            subject=spl_client.Application,
+            accessor=self.src.client.apps,
+            simulate=simulate,
+            actions={
+                # "create": self.dest.apps.create,
+                "remove": self.dest.apps.delete,
+                "capabilities": self.dest.apps.update,
+                "perm.read": self.dest.apps.update,
+            },
+        ).sync()
+
     class DiffHandler:
-        def __init__(self, parent, diff, subject: type, simulate: bool, actions: dict = {}):
+        def __init__(
+            self, parent, diff, accessor, subject: type, simulate: bool, actions: dict = {}
+        ):
             self._diff_gen = diff
             self.src = parent.src
             self.dest = parent.dest
             self._sync_actions = actions
             self.subject = subject
+            self.accessor = accessor
             self.interactive = parent._interactive
             self.simulate = simulate
             self._log = parent._log
@@ -123,22 +114,13 @@ class SyncManager:
                     if property == ""  # Add property in update.
                 ]
                 self._log.info(
-                    f"Missing'{self.subject.__name__}' objects {[item for item, _ in items]}."
+                    f"Missing '{self.subject.__name__}' objects {[item for item, _ in items]}."
                 )
                 for item, property in items:
                     if "create" not in self._sync_actions:
                         self._log.debug(
                             f"Ignoring creation of '{self.subject.__name__}' for '{item}'."
                         )
-                        continue
-                    if (
-                        self.interactive
-                        and inquirer.confirm(
-                            message=f"Do you want to create {self.subject.__name__} '{item}'?",
-                            default=True,
-                        ).execute()
-                        is not True
-                    ):
                         continue
                     if self.simulate:
                         self._log.info(
@@ -148,7 +130,9 @@ class SyncManager:
                     self._log.info(
                         f"Triggering creation of '{self.subject.__name__}' for '{item}'."
                     )
-                    self._sync_actions["create"](item)
+                    print(self.accessor)
+                    print(item)
+                    self._sync_actions["create"](self.accessor[item])
 
         def _delete(self):
             """Sync completely missing entities (i.e. User, Index, ...)."""
@@ -170,148 +154,96 @@ class SyncManager:
                             f"Ignoring removal of '{self.subject.__name__}' for '{item}'."
                         )
                         continue
-                    if (
-                        self.interactive
-                        and inquirer.confirm(
-                            message=f"Do you want to remove {self.subject.__name__} '{item}'?",
-                            default=False,
-                        ).execute()
-                        is not True
-                    ):
-                        continue
                     if self.simulate:
                         self._log.info(
                             f"Simulated removal of '{self.subject.__name__}' for '{item}'."
                         )
                         continue
                     self._log.info(f"Triggering removal of '{self.subject.__name__}' for '{item}'.")
-                    self._sync_actions["create"](item)
+                    self._sync_actions["delete"](self.dest.client, self.accessor[item])
 
         def _update(self):
+            print(self._sync_actions)
             """Synchronize all changes between src entity and dest entity."""
-            # print({key: val for key,val in self.diff.items() if key not in ["dictionary_item_added", "dictionary_item_added"]})
-            if "dictionary_item_removed" in self.diff:
-                items = [
-                    (entity_name, sanitized_path)
-                    for entity_name, sanitized_path in [
-                        self._sanitize_item_path(item)
-                        for item in self.diff["dictionary_item_removed"]
+            for mode in ["dictionary_item_added", "dictionary_item_removed"]:
+                if mode in self.diff:
+                    items = [
+                        (entity_name, sanitized_path)
+                        for entity_name, sanitized_path in [
+                            self._sanitize_item_path(item) for item in self.diff[mode]
+                        ]
+                        if sanitized_path != ""
                     ]
-                    if sanitized_path != ""
-                ]
-                for entity_name, sanitized_path in items:
-                    self._log.info(
-                        f"Missing '{self.subject.__name__}' property '{sanitized_path}' for '{entity_name}'."
-                    )
-                    if sanitized_path not in self._sync_actions:
+                    for entity_name, sanitized_path in items:
+                        print_path = sanitized_path.replace("content.", "")
                         self._log.debug(
-                            f"Ignoring '{self.subject.__name__}' update '{sanitized_path}' for '{entity_name}'."
+                            f"Different '{self.subject.__name__}' property '{print_path}' for '{entity_name}'."
                         )
-                        continue
-                    if (
-                        self.interactive
-                        and inquirer.confirm(
-                            message=f"Do you want to add {self.subject.__name__} property '{sanitized_path}' for '{entity_name}'.",
-                            default=True,
-                        ).execute()
-                        is not True
-                    ):
-                        continue
-                    if self.simulate:
-                        self._log.info(
-                            f"Simulated adding '{self.subject.__name__}' property '{sanitized_path}' for '{entity_name}'."
-                        )
-                        continue
-                    if sanitized_path in self._sync_actions and not self.simulate:
-                        self._log.info(
-                            f"Synchronizing entity '{entity_name}' property '{sanitized_path}' for '{entity_name}'."
-                        )
-                        try:
-                            self._sync_actions[sanitized_path](entity_name, sanitized_path)
-                        except KeyError:
+                        if (
+                            sanitized_path not in self._sync_actions
+                            and "*" not in self._sync_actions.keys()
+                        ):
+                            self._log.debug(
+                                f"Ignoring '{self.subject.__name__}' update '{print_path}' for '{entity_name}'."
+                            )
+                            continue
+
+                        if self.simulate:
                             self._log.info(
-                                f"No '{self.subject.__name__}' action defined to update '{sanitized_path}' property for '{entity_name}'."
+                                f"Simulated adding '{self.subject.__name__}' property '{print_path}' for '{entity_name}'."
                             )
-            if "dictionary_item_added" in self.diff:
-                print(
-                    [self._sanitize_item_path(item) for item in self.diff["dictionary_item_added"]]
-                )
-                items = [
-                    (entity_name, sanitized_path)
-                    for entity_name, sanitized_path in [
-                        self._sanitize_item_path(item)
-                        for item in self.diff["dictionary_item_added"]
-                    ]
-                    if sanitized_path != ""
-                ]
-                for entity_name, sanitized_path in items:
-                    self._log.info(
-                        f"Additional '{self.subject.__name__}' property '{sanitized_path}' for '{entity_name}'."
-                    )
-                    if sanitized_path not in self._sync_actions:
-                        self._log.debug(
-                            f"Ignoring '{self.subject.__name__}' property '{sanitized_path}' update for '{entity_name}'."
-                        )
-                        continue
-                    if (
-                        self.interactive
-                        and inquirer.confirm(
-                            message=f"Do you want to remove '{self.subject.__name__}' property '{sanitized_path}' for '{entity_name}'.",
-                            default=True,
-                        ).execute()
-                        is not True
-                    ):
-                        continue
-                    if self.simulate:
-                        self._log.info(
-                            f"Simulated '{self.subject.__name__}' update of property '{sanitized_path}' for '{entity_name}'."
-                        )
-                        continue
-                    if sanitized_path in self._sync_actions and not self.simulate:
-                        self._log.info(
-                            f"Synchronizing '{self.subject.__name__}' entity '{entity_name}' property '{sanitized_path}'."
-                        )
-                        try:
-                            self._sync_actions[sanitized_path](entity_name, sanitized_path)
-                        except KeyError:
+                            continue
+                        if sanitized_path in self._sync_actions or "*" in self._sync_actions:
                             self._log.info(
-                                f"No '{self.subject.__name__}' defined to update '{sanitized_path}' property for '{entity_name}'."
+                                f"Synchronizing entity '{entity_name}' property '{print_path}' for '{entity_name}'."
                             )
-            if "values_changed" in self.diff:
-                for item_path, value in self.diff["values_changed"].items():
-                    entity_name, sanitized_path = self._sanitize_item_path(str(item_path))
-                    self._log.info(f"Detected diff for '{entity_name}' from '{sanitized_path}'")
-                    if sanitized_path not in self._sync_actions:
-                        self._log.debug(
-                            f"Ignoring '{self.subject.__name__}' property '{sanitized_path}' from '{value['old_value']}' to '{value['new_value']}'."
-                        )
-                        continue
-                    if (
-                        self.interactive
-                        and inquirer.confirm(
-                            message=f"Do you want to update '{self.subject.__name__}' property '{sanitized_path}' from '{value['old_value']}' to '{value['new_value']}'?",
-                            default=True,
-                        ).execute()
-                        is not True
-                    ):
-                        continue
-                    if self.simulate:
-                        self._log.info(
-                            f"Simulated '{self.subject.__name__}' update of property '{sanitized_path}' from '{value['old_value']}' to '{value['new_value']}'."
-                        )
-                        continue
-                    if sanitized_path in self._sync_actions and not self.simulate:
-                        self._log.info(
-                            f"Synchronizing '{self.subject.__name__}' property '{sanitized_path}' from '{value['old_value']}' to '{value['new_value']}'."
-                        )
-                        try:
-                            self._sync_actions[sanitized_path](
-                                self._src, self._dest, entity_name, value["new_value"]
-                            )
-                        except KeyError:
+                            try:
+                                self._sync_actions[sanitized_path](
+                                    self.accessor[entity_name], sanitized_path
+                                )
+                            except KeyError as key_error:
+                                # print(str(key_error))
+                                if not "import" in str(key_error):
+                                    self._log.error(
+                                        f"Failed to access '{self.subject.__name__}' property '{print_path}' for '{entity_name}'."
+                                    )
+                        else:
                             self._log.info(
-                                f"No action defined to update update '{self.subject.__name__}' property '{sanitized_path}' from '{value['old_value']}' to '{value['new_value']}'."
+                                f"No '{self.subject.__name__}' action defined to update '{print_path}' property for '{entity_name}'."
                             )
+            for mode in ["values_changed", "type_changes"]:
+                if mode in self.diff:
+                    for item_path, value in self.diff[mode].items():
+                        entity_name, sanitized_path = self._sanitize_item_path(str(item_path))
+                        print_path = sanitized_path.replace("content.", "")
+                        self._log.info(f"Detected diff for '{entity_name}' from '{print_path}'")
+                        if (
+                            sanitized_path not in self._sync_actions
+                            and "*" not in self._sync_actions.keys()
+                        ):
+                            self._log.debug(
+                                f"Ignoring '{self.subject.__name__}' property '{print_path}' from '{value['old_value']}' to '{value['new_value']}'."
+                            )
+                            continue
+
+                        if self.simulate:
+                            self._log.info(
+                                f"Simulated '{self.subject.__name__}' update of property '{print_path}' from '{value['old_value']}' to '{value['new_value']}'."
+                            )
+                            continue
+                        if sanitized_path in self._sync_actions or "*" in self._sync_actions:
+                            self._log.info(
+                                f"Synchronizing '{self.subject.__name__}' property '{print_path}' from '{value['old_value']}' to '{value['new_value']}'."
+                            )
+                            try:
+                                self._sync_actions[sanitized_path](
+                                    self.accessor[entity_name], sanitized_path
+                                )
+                            except KeyError as key_error:
+                                # print(key_error)
+                                self._log.info(
+                                    f"No '{self.subject.__name__}' action defined to update '{print_path}' property for '{entity_name}'."
+                                )
 
         @staticmethod
         def _sanitize_item_path(item) -> Tuple[str, str]:
@@ -319,17 +251,14 @@ class SyncManager:
 
             Returns entity name and sanitized path as tuple.
             """
-            remove_digits = str.maketrans("", "", digits)
             split_path = (
-                item.replace("root", "")
-                .replace(".", "")
-                .translate(remove_digits)
-                .replace("']['", ".")
-                .replace("['", "")
-                .replace("[", "")
-                .replace("]", "")
-                .replace("]'", "")
+                item.replace("root[", "")
+                .replace("]['", ".")
+                # .replace(".", "")
                 .replace("'", "")
+                # .replace("][", ".")
+                .replace("]", "")
+                .replace("[", "")
                 .split(".")
             )
-            return split_path[0], ".".join(split_path[1:])
+            return split_path[0], ".".join([path for path in split_path[1:] if not path.isdigit()])
