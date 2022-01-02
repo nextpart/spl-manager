@@ -9,7 +9,8 @@ spl = SplManager(src="nxtp-onprem", dest="localhost", interactive=False)
 
 # %%
 print(
-    "Properties: ", [prop for prop in dir(spl.sync.src.client) if not prop.startswith("_")]
+    "Properties: ",
+    [prop for prop in dir(spl.sync.src.client) if not prop.startswith("_") and prop.endswith("s")],
 )  # and prop.endswith("s")])
 # %%
 print(

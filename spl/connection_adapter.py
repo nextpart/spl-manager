@@ -1,11 +1,13 @@
 # -*- coding: utf-8 -*-
 
+from typing import Optional
+
 import splunklib.binding as spl_context
 import splunklib.client as spl_client
 from InquirerPy import inquirer
 from rich import inspect, print  # pylint: disable=W0622
 
-from spl.objects import Apps, Indexes, Roles, Users
+from spl.objects import Apps, EventTypes, Indexes, Inputs, Roles, SavedSearches, Users
 
 TIME_FORMAT = "%d.%m.%Y %H:%M:%S"
 
@@ -19,9 +21,7 @@ class ConnectionAdapter:
 
     spl: spl_client.Service
 
-    def __init__(
-        self, parent: object, name: str, app: str = "system", sharing="system", owner="admin"
-    ):
+    def __init__(self, parent: object, name: str):
         self._name = name
         self._interactive = parent._interactive
         self._log = parent._log
@@ -31,8 +31,8 @@ class ConnectionAdapter:
             port=self._settings.CONNECTIONS[name]["port"],
             username=self._settings.CONNECTIONS[name]["username"],
             password=self._settings.CONNECTIONS[name]["password"],
-            sharing=sharing,
         )
+        # self.namespace(app, sharing, owner)
         self._log.info(
             f"Connection adapter for '{self._name}' ({self.client.authority})"
             + f" as user '{self.client.username}' with namespace: {self.client.namespace}."
@@ -40,19 +40,37 @@ class ConnectionAdapter:
 
     @property
     def roles(self):
-        return Roles(self.client, interactive=self._interactive)
+        return Roles(self.client, accessor=self.client.roles, interactive=self._interactive)
 
     @property
     def users(self):
-        return Users(self.client, interactive=self._interactive)
+        return Users(self.client, accessor=self.client.users, interactive=self._interactive)
 
     @property
     def apps(self):
-        return Apps(self.client, interactive=self._interactive)
+        return Apps(self.client, accessor=self.client.apps, interactive=self._interactive)
 
     @property
     def indexes(self):
-        return Indexes(self.client, interactive=self._interactive)
+        return Indexes(self.client, accessor=self.client.indexes, interactive=self._interactive)
+
+    @property
+    def event_types(self):
+        return EventTypes(
+            self.client, accessor=self.client.event_types, interactive=self._interactive
+        )
+
+    @property
+    def saved_searches(self):
+        return SavedSearches(
+            self.client, accessor=self.client.saved_searches, interactive=self._interactive
+        )
+
+    @property
+    def inputs(self):
+        return Inputs(
+            client=self.client, accessor=self.client.inputs, interactive=self._interactive
+        )
 
     def __str__(self):
         self._log.info(f"Connection user {self.client.username}")
@@ -70,7 +88,12 @@ class ConnectionAdapter:
             self.client.restart(timeout=360)
             self._log.info("Up again.")
 
-    def namespace(self, app=None, sharing=None, owner=None):
+    def namespace(
+        self,
+        app: Optional[str] = None,  # "system",
+        sharing: Optional[str] = None,  # "system",
+        owner: Optional[str] = None,  # "admin",
+    ):
         """Namespace context for splunk interaction.
 
         Args:
@@ -80,23 +103,25 @@ class ConnectionAdapter:
 
         Raises:
             ValueError: [description]
-            ValueError: [description]
-            ValueError: [description]
 
-        Returns:
-            [type]: [description]
         """
+        if app not in [app.name for app in self.client.apps.list()]:
+            app = None
         if self._interactive and app is None:
             self.app = inquirer.select(
                 message="Select an application context:",
-                choices=[app.name for app in self.client.apps.list()],
+                choices=["system"]
+                + [
+                    app.name
+                    for app in self.client.apps.list()
+                    if app.name not in self._settings.APPS.exclude
+                ],
                 default="system",
             ).execute()
         elif app is None:
             self.app = "system"
         elif app not in [app.name for app in self.client.apps.list()]:
             raise ValueError(f"Application '{app}' does not exist")
-
         if self._interactive and sharing is None:
             self.sharing = inquirer.select(
                 message="Select a sharing level:",
@@ -107,10 +132,9 @@ class ConnectionAdapter:
             self.sharing = "system"
         elif sharing not in ["global", "system", "app", "user"]:
             raise ValueError("Invalid sharing mode")
-
         if self._interactive and owner is None:
             self.owner = inquirer.select(
-                message="Select a sharing level:",
+                message="Select an owner:",
                 choices=[user.name for user in self.client.users.list()],
                 default="admin",
             ).execute()

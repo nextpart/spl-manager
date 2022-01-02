@@ -17,6 +17,13 @@
       "request": "launch",
       "module": "spl",
       "args": ["--src=nxtp-onprem", "--dest=localhost", "sync", "roles"]
+    },
+    {
+      "name": "spl manager --conn=\"nxtp-onprem\" apps list",
+      "type": "python",
+      "request": "launch",
+      "module": "spl",
+      "args": ["manager", "--conn=\"nxtp-onprem\"", "apps", "list"]
     }
   ]
 }

@@ -9,7 +9,7 @@ from InquirerPy import inquirer
 from rich import inspect, print  # pylint: disable=W0622
 from rich.console import Console
 from rich.progress import track
-from rich.table import Column, Table
+from rich.table import Table
 
 """Splunk object abstractions."""
 
@@ -18,6 +18,9 @@ TIME_FORMAT = "%d.%m.%Y %H:%M:%S"
 
 class Object:
     """A singe splunk object instance."""
+
+    SYNC_EXCLUDE = []
+    __name__ = "generic"
 
     def __init__(self, client, obj):
         self.client = client
@@ -30,30 +33,39 @@ class Object:
 class ObjectList:
     """Multiple splunk objects."""
 
-    __name__ = "generic"
+    SUBTYPE = Object
+    __name__ = SUBTYPE.__name__
 
-    def __init__(self, client: spl_client.Service, interactive=False):
+    def __init__(self, client: spl_client.Service, accessor, interactive=False):
         self.client = client
-        self.items = self.generate()
         self._interactive = interactive
+        self.accessor = accessor
+        self.items = self.generate()
 
     def __str__(self):
         return str([str(item) for item in self.items])
 
     def generate(self):
-        return []
-
-    def list(self, details: bool = False):
-        print()
+        return [self.SUBTYPE(client=self.client, obj=item) for item in self.accessor.list()]
 
     @staticmethod
-    def diff(src_client, dest_client) -> DeepDiff:
-        return None
+    def _diff(src_client_accessor, dest_client_accessor) -> DeepDiff:
+        return DeepDiff(
+            {
+                str(role.name): {"access": role.access, "content": role.content}
+                for role in src_client_accessor
+            },
+            {
+                str(role.name): {"access": role.access, "content": role.content}
+                for role in dest_client_accessor
+            },
+            ignore_order=True,
+        )
 
-    def check_create(self, reference_obj, accessor, simulate: bool = False):
+    def check_create(self, reference_obj, simulate: bool = False):
         if (
-            not self._interactive
-            and inquirer.confirm(
+            self._interactive
+            and not inquirer.confirm(
                 message=f"Do you want to create {self.__name__} '{reference_obj.name}' on "
                 + f"{self.client.host}?",
                 default=True,
@@ -63,15 +75,49 @@ class ObjectList:
         if simulate:
             logging.info(f"Simulated {self.__name__} creation of '{reference_obj.name}'.")
             return False
-        logging.info(f"Creating {self.__name__} entity '{reference_obj.name}'.")
+        logging.info(
+            f"Creating {self.__name__} entity '{reference_obj.name}' on {self.client.host}."
+        )
         return True
 
     def create(self, reference_obj, simulate: bool = False):
-        raise NotImplementedError(f"Creating {self.__name__} on {self.client.hostname}")
+        if not self.check_create(reference_obj=reference_obj, simulate=simulate):
+            return
+        args = {
+            field: reference_obj.content[field]
+            for field in reference_obj.fields["optional"]
+            if field in reference_obj.content
+            and reference_obj.content[field] is not None
+            and reference_obj.content[field] != "-1"
+            and field not in self.SUBTYPE.SYNC_EXCLUDE
+        }
 
-    def check_update(self, reference_obj, prop, accessor, simulate: bool = False):
+        if (
+            "capabilities" in reference_obj.fields["required"]
+            or "capabilities" in reference_obj.fields["optional"]
+        ):
+            args["capabilities"] = []
+            for capability in reference_obj.capabilities:
+                if capability in self.client.capabilities:
+                    args["capabilities"].append(capability)
+                else:
+                    logging.warning(
+                        f"The {self.__name__} {reference_obj.name} has an unknown capability ('{capability}')"
+                        + " assigned. We'll skip this assignment. You can sync later on."
+                    )
         try:
-            old_value = accessor[reference_obj.name]
+            if isinstance(reference_obj, spl_client.User):
+                self.accessor.create(
+                    reference_obj.name, password="mySplunkDevDefaultP4ssw0rd!", **args
+                )
+            else:
+                self.accessor.create(reference_obj.name, **args)
+        except spl_context.HTTPError as error:
+            logging.error(error)
+
+    def check_update(self, reference_obj, prop, simulate: bool = False):
+        try:
+            old_value = self.accessor[reference_obj.name]
             for item in prop.split("."):
                 old_value = old_value[item]
         except KeyError:
@@ -83,15 +129,19 @@ class ObjectList:
         except KeyError:
             new_value = None
 
-        if old_value in [None, "-1"] and new_value in [None, "-1"]:
+        if (
+            old_value in [None, "-1"]
+            and new_value in [None, "-1"]
+            or prop.replace("content.", "") in self.SUBTYPE.SYNC_EXCLUDE
+        ):
             logging.info(
                 f"Ignoring {self.__name__} update '{reference_obj.name}' for "
                 + f"'{prop.replace('content.','')}' from '{old_value}' to '{new_value}'."
             )
-            return False
+            return False, None
         if (
             self._interactive
-            and inquirer.confirm(
+            and not inquirer.confirm(
                 message=f"Do you want to update {self.__name__} '{reference_obj.name}' prop named "
                 + f"{prop.replace('content.','')} from '{old_value}' to '{new_value}'?",
                 default=False,
@@ -101,27 +151,39 @@ class ObjectList:
                 f"Skipping {self.__name__} update '{reference_obj.name}' for "
                 + f"'{prop.replace('content.','')}' from '{old_value}' to '{new_value}'."
             )
-            return False
+            return False, None
         if simulate:
             logging.info(
                 f"Simulated {self.__name__} update '{reference_obj.name}' for "
                 + f"'{prop.replace('content.','')}' from '{old_value}' to '{new_value}'."
             )
-            return False
+            return False, None
         logging.info(
             f"Updating {self.__name__} entity '{reference_obj.name}' prop "
             + f"'{prop.replace('content.','')}' from '{old_value}' to '{new_value}'."
         )
-        return True
+        return True, new_value
 
     def update(self, reference_obj, prop, simulate: bool = False):
-        logging.info(f"Updating {self.__name__} on {self.client.hostname}: {prop}")
-        raise NotImplementedError
+        update, new_value = self.check_update(
+            reference_obj=reference_obj,
+            prop=prop,
+            simulate=simulate,
+        )
+        if not update:
+            return
+        logging.info(
+            f"Updating {self.__name__} on {self.client.host}: {prop.replace('content.','')}"
+        )
+        try:
+            self.accessor[reference_obj.name].update(**{prop.replace("content.", ""): new_value})
+        except spl_context.HTTPError as error:
+            logging.error(error)
 
     def check_delete(self, name: str, simulate: bool = False):
         if (
-            not self._interactive
-            and inquirer.confirm(
+            self._interactive
+            and not inquirer.confirm(
                 message=f"Do you want to delete {self.__name__} '{name}' on {self.client.host}?",
                 default=False,
             ).execute()
@@ -134,278 +196,272 @@ class ObjectList:
         return True
 
     def delete(self, name: str, simulate: bool = False):
-        if not self.check_delete(self, name=name, simulate=simulate):
+        if not self.check_delete(name=name, simulate=simulate):
             return
-        # logging.info(f"Deleting {self.__name__} '{name}' on {self.client.host}")
-        raise NotImplementedError(f"Deleting {self.__name__} '{name}' on {self.client.host}")
+        logging.info(f"Deleting {self.__name__} '{name}' on {self.client.host}")
+        try:
+            self.accessor.delete(name=name)
+        except spl_context.HTTPError as error:
+            logging.error(error)
 
-
-class Role(Object):
-
-    ref_type = spl_client.Role
-    grouping = spl_client.Roles
-    listing = grouping.list
+    def list(self, details: bool = False):
+        if not details:
+            table = Table(
+                *self.SUBTYPE.OVERVIEW_FIELDS.keys(),
+                title=f"{self.__name__} Overview",
+                show_lines=False,
+            )
+        elif "access" not in self.accessor.list()[0].__dict__["_state"]:
+            table = Table(
+                *self.SUBTYPE.DETAIL_FIELDS.keys(),
+                title=f"{self.__name__} Overview",
+                show_lines=False,
+            )
+        else:
+            table = Table(
+                *(
+                    list(self.SUBTYPE.DETAIL_FIELDS.keys())
+                    + ["App", "Sharing", "Owner", "Read", "Write"]
+                ),
+                title=f"{self.__name__} Overview",
+                show_lines=False,
+            )
+        for item in track(self.accessor.list()):
+            row = [item.name]
+            fields = (
+                self.SUBTYPE.DETAIL_FIELDS.items()
+                if details
+                else self.SUBTYPE.OVERVIEW_FIELDS.items()
+            )
+            for key, val in fields:
+                if val is None:
+                    continue
+                printable = item.content[val] if val in item.content else ""
+                if val == "capabilities" and item.content[val] == item.capabilities:
+                    printable = "all"
+                try:
+                    if val not in item.content:
+                        raise KeyError
+                    if isinstance(printable, list):
+                        printable = ", ".join(item.content[val])
+                    elif (
+                        isinstance(printable, str) and printable.replace("-", "").isdigit()
+                    ) or isinstance(printable, int):
+                        printable = int(printable)
+                        if printable < 0:
+                            printable = None
+                        elif printable == 0:
+                            printable = False
+                        elif printable == 1:
+                            printable = True
+                        elif val.startswith("last_"):
+                            printable = datetime.utcfromtimestamp(printable).strftime(TIME_FORMAT)
+                    row.append(str(printable))
+                except:
+                    row.append("")
+            if details and "access" in item.__dict__["_state"]:
+                row += [
+                    item.access["app"],
+                    item.access["sharing"],
+                    item.access["owner"],
+                    ", ".join(item.access["perms"]["read"]),
+                    ", ".join(item.access["perms"]["write"]),
+                ]
+            table.add_row(*list(str(prop) for prop in row))
+        console = Console()
+        console.print(table)
 
 
 class User(Object):
 
-    ref_type = spl_client.User
-    grouping = spl_client.Users
-    listing = grouping.list
+    OVERVIEW_FIELDS = {
+        "User": None,
+        "Type": "type",
+        "Last Login": "last_successful_login",
+    }
+    DETAIL_FIELDS = {
+        **OVERVIEW_FIELDS,
+        **{
+            "Email": "email",
+            "Name": "realname",
+            "Roles": "roles",
+            "Capabilities": "capabilities",
+            "Default App": "defaultApp",
+        },
+    }
+    SYNC_EXCLUDE = ["capabilities", "password", "last_successful_login"]
+    __name__ = "User"
+
+
+class Users(ObjectList):
+
+    SUBTYPE = User
+
+    @staticmethod
+    def diff(src_client, dest_client) -> DeepDiff:
+        return ObjectList._diff(
+            src_client_accessor=src_client.client.users.list(),
+            dest_client_accessor=dest_client.client.users.list(),
+        )
 
 
 class Index(Object):
 
-    ref_type = spl_client.Index
-    grouping = spl_client.Indexes
-    listing = grouping.list
+    OVERVIEW_FIELDS = {
+        "Name": None,
+        "Type": "datatype",
+    }
+    DETAIL_FIELDS = {
+        **OVERVIEW_FIELDS,
+        **{
+            "Path": "homePath",
+            "Integrity": "enableDataIntegrityControl",
+            "Size MB": "maxTotalDataSizeMB",
+            "Buckets MB": "maxDataSize",
+            "Tsidx Optimization": "enableTsidxReduction",
+        },
+    }
+    __name__ = "Index"
+
+
+class Indexes(ObjectList):
+
+    SUBTYPE = Index
+
+    @staticmethod
+    def diff(src_client, dest_client) -> DeepDiff:
+        return ObjectList._diff(
+            src_client_accessor=src_client.client.indexes.list(),
+            dest_client_accessor=dest_client.client.indexes.list(),
+        )
 
 
 class App(Object):
 
-    ref_type = spl_client.Application
-    # grouping = spl_client.apps
-    # listing = grouping.list
+    OVERVIEW_FIELDS = {"ID": None, "Title": "label", "Version": "version"}
+    DETAIL_FIELDS = {
+        **OVERVIEW_FIELDS,
+        **{
+            "Author": "author",
+            "Disabled": "disabled",
+            "Visible": "visible",
+            "Splunkbase": "details",
+            "Nav": "show_in_nav",
+        },
+    }
+    __name__ = "App"
+
+
+class Apps(ObjectList):
+
+    SUBTYPE = App
+
+    @staticmethod
+    def diff(src_client, dest_client) -> DeepDiff:
+        return ObjectList._diff(
+            src_client_accessor=src_client.client.apps.list(),
+            dest_client_accessor=dest_client.client.apps.list(),
+        )
+
+
+class Role(Object):
+
+    OVERVIEW_FIELDS = {
+        "Name": None,
+        "Default App": "defaultApp",
+        "Capabilities": "capabilities",
+        "Imported Roles": "imported_roles",
+    }
+    DETAIL_FIELDS = {
+        **OVERVIEW_FIELDS,
+        **{
+            "Indexes allowed": "srchIndexesAllowed",
+            "Indexes disallowed": "srchIndexesDisallowed",
+            "Search earliest": "srchTimeEarliest",
+        },
+    }
+    __name__ = "Role"
 
 
 class Roles(ObjectList):
 
-    __name__ = "Role"
-
-    def generate(self):
-        return [Role(client=self.client, obj=role) for role in self.client.roles.list()]
-
-    def list(self, details: bool = False):
-        table = (
-            Table(
-                "Name",
-                "Default App",
-                "Capabilities",
-                "Imported Roles",
-                Column("Indexes allowed"),
-                "Indexes disallowed",
-                "Search earliest",
-                "Owner",
-                "App",
-                "Sharing",
-                title="Role Overview",
-            )
-            if details
-            else Table(
-                "Name", "Default App", "Capabilities", "Imported Roles", title="Role Overview"
-            )
-        )
-        for role in track(self.client.roles.list()):
-            if not details:
-                table.add_row(
-                    role.name,
-                    role.content["defaultApp"]
-                    if "defaultApp" in role.content and role.content["defaultApp"]
-                    else "",
-                    str(len(role.content["capabilities"]))
-                    if "capabilities" in role.content and role.content["capabilities"]
-                    else "",
-                    ", ".join(role.content["imported_roles"])
-                    if "imported_roles" in role.content and role.content["imported_roles"]
-                    else "",
-                )
-            else:
-                table.add_row(
-                    role.name,
-                    role.content["defaultApp"]
-                    if "defaultApp" in role.content and role.content["defaultApp"]
-                    else "",
-                    ", ".join(role.content["capabilities"])
-                    if "capabilities" in role.content and role.content["capabilities"]
-                    else "",
-                    ", ".join(role.content["imported_roles"])
-                    if "imported_roles" in role.content and role.content["imported_roles"]
-                    else "",
-                    ", ".join(role.content["srchIndexesAllowed"])
-                    if "srchIndexesAllowed" in role.content and role.content["srchIndexesAllowed"]
-                    else "",
-                    ", ".join(role.content["srchIndexesDisallowed"])
-                    if "srchIndexesDisallowed" in role.content
-                    and role.content["srchIndexesDisallowed"]
-                    else "",
-                    role.content["srchTimeEarliest"]
-                    if "srchTimeEarliest" in role.content
-                    and role.content["srchTimeEarliest"] != "-1"
-                    else "",
-                    role.access["owner"] if "owner" in role.access and role.access["owner"] else "",
-                    role.access["app"] if "app" in role.access and role.access["app"] else "",
-                    role.access["sharing"]
-                    if "sharing" in role.access and role.access["sharing"]
-                    else "",
-                )
-        console = Console()
-        console.print(table)
+    SUBTYPE = Role
 
     @staticmethod
     def diff(src_client, dest_client) -> DeepDiff:
-        return DeepDiff(
-            {
-                str(role.name): {"access": role.access, "content": role.content}
-                for role in src_client.client.roles.list()
-            },
-            {
-                str(role.name): {"access": role.access, "content": role.content}
-                for role in dest_client.client.roles.list()
-            },
-            ignore_order=True,
+        return ObjectList._diff(
+            src_client_accessor=src_client.client.roles.list(),
+            dest_client_accessor=dest_client.client.roles.list(),
         )
 
-    def create(self, reference_obj: spl_client.Role, simulate: bool = False):
-        if not self.confirm_create(name=reference_obj.name):
-            return
-        args = {
-            field: reference_obj.content[field]
-            for field in reference_obj.fields["optional"]
-            if field in reference_obj.content
-            and reference_obj.content[field] is not None
-            and reference_obj.content[field] != "-1"
-            and field
-            not in [
-                "capabilities",
-            ]
-        }
-        args["capabilities"] = []
-        for capability in reference_obj.capabilities:
-            if capability in self.client.capabilities:
-                args["capabilities"].append(capability)
-            else:
-                logging.warning(
-                    f"The role {reference_obj.name} has an unknown capability ('{capability}')"
-                    + " assigned. We'll skip this assignment. You can sync later on."
-                )
-        try:
-            self.client.roles.create(name=reference_obj.name, **args)
-        except spl_context.HTTPError as error:
-            logging.error(error)
 
-    def update(self, reference_obj, prop, simulate: bool = False):
-        if not self.check_update(
-            reference_obj=reference_obj,
-            prop=prop,
-            accessor=self.client.roles,
-            simulate=simulate,
-        ):
-            return
-        print("updating...")
+class EventType(Object):
 
-        # try:
-        #     self.client.roles.
-        # except spl_context.HTTPError as error:
-        #     logging.error(error)
-
-    def delete(self, name, simulate: bool = False):
-        pass
+    OVERVIEW_FIELDS = {
+        "Name": None,
+    }
+    DETAIL_FIELDS = {
+        **OVERVIEW_FIELDS,
+        **{},
+    }
+    __name__ = "EventType"
 
 
-class Users(ObjectList):
-    def generate(self):
-        return [User(client=self.client, obj=role) for role in self.client.roles.list()]
+class EventTypes(ObjectList):
 
-    def list(self, details: bool = False):
-        table = (
-            Table(
-                "User",
-                "Email",
-                "Name",
-                "Type",
-                "Roles",
-                "Capabilities",
-                "Default App",
-                "Last Login",
-            )
-            if details
-            else Table("User", "Type", "Last Login", title="User Overview")
-        )
-        for user in track(self.client.users.list()):
-            if not details:
-                table.add_row(
-                    user.name,
-                    user.content["type"] if "type" in user.content else "",
-                    (
-                        datetime.utcfromtimestamp(
-                            int(user.content["last_successful_login"])
-                        ).strftime(TIME_FORMAT)
-                        if "last_successful_login" in user.content
-                        else ""
-                    ),
-                )
-            else:
-                table.add_row(
-                    user.name,
-                    user.content["email"] if "email" in user.content else "",
-                    user.content["realname"] if "realname" in user.content else "",
-                    user.content["type"] if "type" in user.content else "",
-                    ", ".join(user.content["roles"]) if "roles" in user.content else "",
-                    str(len(user.content["capabilities"])) if "capabilities" in user.content else 0,
-                    user.content["defaultApp"] if "defaultApp" in user.content else "",
-                    (
-                        str(
-                            datetime.utcfromtimestamp(
-                                int(user.content["last_successful_login"])
-                            ).strftime(TIME_FORMAT)
-                        )
-                        if "last_successful_login" in user.content
-                        else ""
-                    ),
-                )
-        console = Console()
-        console.print(table)
+    SUBTYPE = EventType
 
     @staticmethod
     def diff(src_client, dest_client) -> DeepDiff:
-        return DeepDiff(
-            {
-                str(user.name): {"access": user.access, "content": user.content}
-                for user in src_client.client.users.list()
-            },
-            {
-                str(user.name): {"access": user.access, "content": user.content}
-                for user in dest_client.client.users.list()
-            },
-            ignore_order=True,
-        )
-
-    def create(self, reference_obj: spl_client.Role, simulate: bool = False):
-        # print(reference_obj.__dict__)
-        pass
-
-    def update(self, reference_obj, prop, simulate: bool = False):
-        # print(kwargs)
-        pass
-
-
-class Indexes(ObjectList):
-    @staticmethod
-    def diff(src_client, dest_client) -> DeepDiff:
-        return DeepDiff(
-            {
-                str(index.name): {"access": index.access, "content": index.content}
-                for index in src_client.client.indexes.list()
-            },
-            {
-                str(index.name): {"access": index.access, "content": index.content}
-                for index in dest_client.client.indexes.list()
-            },
-            ignore_order=True,
+        return ObjectList._diff(
+            src_client_accessor=src_client.client.event_types.list(),
+            dest_client_accessor=dest_client.client.event_types.list(),
         )
 
 
-class Apps(ObjectList):
+class SavedSearch(Object):
+
+    OVERVIEW_FIELDS = {
+        "Name": None,
+    }
+    DETAIL_FIELDS = {
+        **OVERVIEW_FIELDS,
+        **{},
+    }
+    __name__ = "SavedSearch"
+
+
+class SavedSearches(ObjectList):
+
+    SUBTYPE = SavedSearch
+
     @staticmethod
     def diff(src_client, dest_client) -> DeepDiff:
-        return DeepDiff(
-            {
-                str(app.name): {"access": app.access, "content": app.content}
-                for app in src_client.client.apps.list()
-            },
-            {
-                str(app.name): {"access": app.access, "content": app.content}
-                for app in dest_client.client.apps.list()
-            },
-            ignore_order=True,
+        return ObjectList._diff(
+            src_client_accessor=src_client.client.saved_searches.list(),
+            dest_client_accessor=dest_client.client.saved_searches.list(),
+        )
+
+
+class Input(Object):
+
+    OVERVIEW_FIELDS = {
+        "Name": None,
+    }
+    DETAIL_FIELDS = {
+        **OVERVIEW_FIELDS,
+        **{},
+    }
+    __name__ = "Input"
+
+
+class Inputs(ObjectList):
+
+    SUBTYPE = Input
+
+    @staticmethod
+    def diff(src_client, dest_client) -> DeepDiff:
+        return ObjectList._diff(
+            src_client_accessor=src_client.client.inputs.list(),
+            dest_client_accessor=dest_client.client.inputs.list(),
         )

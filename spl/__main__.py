@@ -9,6 +9,7 @@ from typing import Union
 import fire
 from cerberus import Validator  # Receive and work with what we expect
 from dynaconf import Dynaconf
+from rich import inspect, print  # pylint: disable=W0622
 from rich.logging import RichHandler
 
 from spl.apps_manager import AppsManager
@@ -61,9 +62,6 @@ class SplManager:
             self._src = None
         if dest is not None and dest in self._settings.CONNECTIONS:
             self._dest = ConnectionAdapter(parent=self, name=dest)
-            self.manager = self._dest
-            # def manager(self):
-            #     return self._dest
         else:
             self._dest = None
 
@@ -71,6 +69,16 @@ class SplManager:
             self.sync = SyncManager(
                 self, interactive=self._interactive, src=self._src, dest=self._dest
             )
+
+    def manager(self, conn: str) -> ConnectionAdapter:
+        """Splunk connection management.
+
+        Returns:
+            ConnectionAdapter: Splunk connection wrapper.
+        """
+        conn_adapter = ConnectionAdapter(self, name=conn)
+        conn_adapter.namespace()
+        return conn_adapter
 
     def docker(self) -> DockerManager:
         """Docker container management for splunk local development.

@@ -7,7 +7,7 @@ from InquirerPy import inquirer
 from rich import print  # pylint: disable=W0622
 
 from spl.connection_adapter import ConnectionAdapter
-from spl.objects import Apps, Roles, Users
+from spl.objects import Apps, EventTypes, Indexes, Inputs, Roles, SavedSearches, Users
 
 
 class SyncManager:
@@ -25,54 +25,139 @@ class SyncManager:
         self._log.level = logging.DEBUG
 
     def roles(
-        self, create: bool = True, update: bool = True, delete: bool = True, simulate: bool = False
+        self,
+        create: bool = False,
+        update: bool = False,
+        delete: bool = False,
+        simulate: bool = False,
     ):
-        # print(Roles.diff(self.src, self.dest))
-        handler = self.DiffHandler(
+        handler = self._DiffHandler(
             parent=self,
             diff=Roles.diff,
             accessor=self.src.client.roles,
             subject=spl_client.Role,
             actions={
                 "create": self.dest.roles.create,
-                "remove": self.dest.roles.delete,
+                "delete": self.dest.roles.delete,
                 "*": self.dest.roles.update,
-                # "content.srchIndexesDefault": self.dest.roles.update,
-                # "remove": None,
             },
-        ).sync(
-            create=create, update=update, delete=delete, simulate=simulate
-        )  # diff=self.user_diff)
+        ).sync(create=create, update=update, delete=delete, simulate=simulate)
 
-    def users(self, simulate: bool = False):
-        self.DiffHandler(
+    def users(
+        self,
+        create: bool = False,
+        update: bool = False,
+        delete: bool = False,
+        simulate: bool = False,
+    ):
+        self._DiffHandler(
             parent=self,
             diff=Users.diff,
             subject=spl_client.User,
             accessor=self.src.client.users,
             actions={
                 "create": self.dest.users.create,
-                "remove": self.dest.users.update,
-                "capabilities": self.dest.users.update,
-                "perm.read": self.dest.users.update,
+                "delete": self.dest.users.update,
+                "*": self.dest.users.update,
             },
-        ).sync()  # diff=self.user_diff)
+        ).sync(create=create, update=update, delete=delete, simulate=simulate)
 
-    def apps(self, simulate: bool = False):
-        self.DiffHandler(
+    def indexes(
+        self,
+        create: bool = False,
+        update: bool = False,
+        delete: bool = False,
+        simulate: bool = False,
+    ):
+        self._DiffHandler(
+            parent=self,
+            diff=Indexes.diff,
+            subject=spl_client.Index,
+            accessor=self.src.client.indexes,
+            actions={
+                "create": self.dest.indexes.create,
+                "delete": self.dest.indexes.update,
+                "*": self.dest.indexes.update,
+            },
+        ).sync(create=create, update=update, delete=delete, simulate=simulate)
+
+    def apps(
+        self,
+        create: bool = False,
+        update: bool = False,
+        delete: bool = False,
+        simulate: bool = False,
+    ):
+        self._DiffHandler(
             parent=self,
             diff=Apps.diff,
             subject=spl_client.Application,
             accessor=self.src.client.apps,
             actions={
-                # "create": self.dest.apps.create,
-                "remove": self.dest.apps.delete,
-                "capabilities": self.dest.apps.update,
-                "perm.read": self.dest.apps.update,
+                "create": self.dest.apps.create,
+                "delete": self.dest.apps.delete,
+                "*": self.dest.apps.update,
             },
-        ).sync()
+        ).sync(create=create, update=update, delete=delete, simulate=simulate)
 
-    class DiffHandler:
+    def event_types(
+        self,
+        create: bool = False,
+        update: bool = False,
+        delete: bool = False,
+        simulate: bool = False,
+    ):
+        self._DiffHandler(
+            parent=self,
+            diff=EventTypes.diff,
+            subject=spl_client.EventType,
+            accessor=self.src.client.event_types,
+            actions={
+                "create": self.dest.event_types.create,
+                "delete": self.dest.event_types.update,
+                "*": self.dest.event_types.update,
+            },
+        ).sync(create=create, update=update, delete=delete, simulate=simulate)
+
+    def saved_searches(
+        self,
+        create: bool = False,
+        update: bool = False,
+        delete: bool = False,
+        simulate: bool = False,
+    ):
+        self._DiffHandler(
+            parent=self,
+            diff=SavedSearches.diff,
+            subject=spl_client.SavedSearches,
+            accessor=self.src.client.saved_searches,
+            actions={
+                "create": self.dest.saved_searches.create,
+                "delete": self.dest.saved_searches.update,
+                "*": self.dest.saved_searches.update,
+            },
+        ).sync(create=create, update=update, delete=delete, simulate=simulate)
+
+    def inputs(
+        self,
+        create: bool = False,
+        update: bool = False,
+        delete: bool = False,
+        simulate: bool = False,
+    ):
+        self._DiffHandler(
+            parent=self,
+            diff=Inputs.diff,
+            subject=spl_client.Inputs,
+            accessor=self.src.client.inputs,
+            actions={
+                "create": self.dest.inputs.create,
+                "delete": self.dest.inputs.update,
+                "*": self.dest.inputs.update,
+            },
+        ).sync(create=create, update=update, delete=delete, simulate=simulate)
+
+    class _DiffHandler:
 
         simulate = True
         diff = None
@@ -121,6 +206,8 @@ class SyncManager:
                     ]
                     if property == ""  # Add property in update.
                 ]
+                if not items:
+                    return
                 self._log.info(
                     f"Detected {self.subject.__name__.lower()} objects {items} on {self.src._name}"
                     + f" not existing on {self.dest._name}."
@@ -142,7 +229,7 @@ class SyncManager:
 
         def _delete(self):
             """Sync completely missing entities (i.e. User, Index, ...)."""
-            if "dictionary_item_added" in self.diff and "remove" in self._sync_actions:
+            if "dictionary_item_added" in self.diff and "delete" in self._sync_actions:
                 items = [
                     item
                     for item, property in [
