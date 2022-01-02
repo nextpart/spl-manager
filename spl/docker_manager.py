@@ -30,7 +30,7 @@ class DockerManager:
 
     def __str__(self):
         print(f" - Image:          '{self.image['RepoTags'][0]}'")
-        if self._container is not None and "State" in self._container.keys():
+        if self._container is not None and "State" in self._container:
             print(f" - Container:      '{self._container['State']}'")
         return "Docker helper for Splunk development purposes."
 
@@ -212,6 +212,11 @@ class DockerManager:
         )
 
     def stop(self):
+        """Stop the container instance.
+
+        Raises:
+            NotImplementedError: [description]
+        """
         raise NotImplementedError()
 
     def upload(self, path: Union[Path, str] = Path.cwd(), app: str = None):

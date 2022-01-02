@@ -1,6 +1,6 @@
+# -*- coding: utf-8 -*-
 import logging
 from datetime import datetime
-from typing import Any
 
 import splunklib.binding as spl_context
 import splunklib.client as spl_client
@@ -11,19 +11,27 @@ from rich.console import Console
 from rich.progress import track
 from rich.table import Column, Table
 
+"""Splunk object abstractions."""
+
 TIME_FORMAT = "%d.%m.%Y %H:%M:%S"
 
 
 class Object:
-    def __init__(self, client, object):
+    """A singe splunk object instance."""
+
+    def __init__(self, client, obj):
         self.client = client
-        self.object = object
+        self.obj = obj
 
     def __str__(self):
-        return self.object.name
+        return self.obj.name
 
 
 class ObjectList:
+    """Multiple splunk objects."""
+
+    __name__ = "generic"
+
     def __init__(self, client: spl_client.Service, interactive=False):
         self.client = client
         self.items = self.generate()
@@ -42,52 +50,122 @@ class ObjectList:
     def diff(src_client, dest_client) -> DeepDiff:
         return None
 
-    def confirm_create(self, name: str):
-        return self.interactive and inquirer.confirm(
-            message=f"Do you want to create {self.__name__} '{name}' on {self.client.host}?",
-            default=True,
-        )
+    def check_create(self, reference_obj, accessor, simulate: bool = False):
+        if (
+            not self._interactive
+            and inquirer.confirm(
+                message=f"Do you want to create {self.__name__} '{reference_obj.name}' on "
+                + f"{self.client.host}?",
+                default=True,
+            ).execute()
+        ):
+            return False
+        if simulate:
+            logging.info(f"Simulated {self.__name__} creation of '{reference_obj.name}'.")
+            return False
+        logging.info(f"Creating {self.__name__} entity '{reference_obj.name}'.")
+        return True
 
-    def create(self, reference_obj):
-        if not self.confirm_create(self, reference_obj.name):
+    def create(self, reference_obj, simulate: bool = False):
+        raise NotImplementedError(f"Creating {self.__name__} on {self.client.hostname}")
+
+    def check_update(self, reference_obj, prop, accessor, simulate: bool = False):
+        try:
+            old_value = accessor[reference_obj.name]
+            for item in prop.split("."):
+                old_value = old_value[item]
+        except KeyError:
+            old_value = None
+        new_value = reference_obj
+        try:
+            for item in prop.split("."):
+                new_value = new_value[item]
+        except KeyError:
+            new_value = None
+
+        if old_value in [None, "-1"] and new_value in [None, "-1"]:
+            logging.info(
+                f"Ignoring {self.__name__} update '{reference_obj.name}' for "
+                + f"'{prop.replace('content.','')}' from '{old_value}' to '{new_value}'."
+            )
+            return False
+        if (
+            self._interactive
+            and inquirer.confirm(
+                message=f"Do you want to update {self.__name__} '{reference_obj.name}' prop named "
+                + f"{prop.replace('content.','')} from '{old_value}' to '{new_value}'?",
+                default=False,
+            ).execute()
+        ):
+            logging.info(
+                f"Skipping {self.__name__} update '{reference_obj.name}' for "
+                + f"'{prop.replace('content.','')}' from '{old_value}' to '{new_value}'."
+            )
+            return False
+        if simulate:
+            logging.info(
+                f"Simulated {self.__name__} update '{reference_obj.name}' for "
+                + f"'{prop.replace('content.','')}' from '{old_value}' to '{new_value}'."
+            )
+            return False
+        logging.info(
+            f"Updating {self.__name__} entity '{reference_obj.name}' prop "
+            + f"'{prop.replace('content.','')}' from '{old_value}' to '{new_value}'."
+        )
+        return True
+
+    def update(self, reference_obj, prop, simulate: bool = False):
+        logging.info(f"Updating {self.__name__} on {self.client.hostname}: {prop}")
+        raise NotImplementedError
+
+    def check_delete(self, name: str, simulate: bool = False):
+        if (
+            not self._interactive
+            and inquirer.confirm(
+                message=f"Do you want to delete {self.__name__} '{name}' on {self.client.host}?",
+                default=False,
+            ).execute()
+        ):
+            return False
+        if simulate:
+            logging.info(f"Simulated {self.__name__} creation of '{name}'.")
+            return False
+        logging.info(f"Deleting {self.__name__} entity '{name}'.")
+        return True
+
+    def delete(self, name: str, simulate: bool = False):
+        if not self.check_delete(self, name=name, simulate=simulate):
             return
-        logging.info(f"Creating {self.__name__} on {self.client.hostname}")
-
-    def confirm_update(self, name, prop: str, old_val: str, new_val: str):
-        return self.interactive and inquirer.confirm(
-            message=f"Do you want to update {self.__name__} '{name}' property named "
-            + f"{prop} from '{old_val}' to '{new_val}'?",
-            default=False,
-        )
-
-    def update(self, **kwargs):
-        # if not self.confirm_update(self, ??? ): return
-        logging.info(f"Updating {self.__name__} on {self.client.hostname}: {kwargs}")
-
-    def confirm_delete(self, name: str):
-        return self.interactive and inquirer.confirm(
-            message=f"Do you want to delete {self.__name__} '{name}' on {self.client.host}?",
-            default=False,
-        )
-
-    def delete(self, name):
-        if not self.confirm_delete(self, name=name):
-            return
-        logging.info(f"Deleting {self.__name__} '{name}' on {self.client.host}")
+        # logging.info(f"Deleting {self.__name__} '{name}' on {self.client.host}")
+        raise NotImplementedError(f"Deleting {self.__name__} '{name}' on {self.client.host}")
 
 
 class Role(Object):
 
-    type = spl_client.Role
+    ref_type = spl_client.Role
     grouping = spl_client.Roles
     listing = grouping.list
 
 
 class User(Object):
 
-    type = spl_client.User
+    ref_type = spl_client.User
     grouping = spl_client.Users
     listing = grouping.list
+
+
+class Index(Object):
+
+    ref_type = spl_client.Index
+    grouping = spl_client.Indexes
+    listing = grouping.list
+
+
+class App(Object):
+
+    ref_type = spl_client.Application
+    # grouping = spl_client.apps
+    # listing = grouping.list
 
 
 class Roles(ObjectList):
@@ -95,7 +173,7 @@ class Roles(ObjectList):
     __name__ = "Role"
 
     def generate(self):
-        return [Role(client=self.client, object=role) for role in self.client.roles.list()]
+        return [Role(client=self.client, obj=role) for role in self.client.roles.list()]
 
     def list(self, details: bool = False):
         table = (
@@ -177,7 +255,9 @@ class Roles(ObjectList):
             ignore_order=True,
         )
 
-    def create(self, reference_obj: spl_client.Role):
+    def create(self, reference_obj: spl_client.Role, simulate: bool = False):
+        if not self.confirm_create(name=reference_obj.name):
+            return
         args = {
             field: reference_obj.content[field]
             for field in reference_obj.fields["optional"]
@@ -195,38 +275,36 @@ class Roles(ObjectList):
                 args["capabilities"].append(capability)
             else:
                 logging.warning(
-                    f"The role {reference_obj.name} has an unknown capability {capability}"
-                    + " assignes. We'll skip this assignment. You can sync later on."
+                    f"The role {reference_obj.name} has an unknown capability ('{capability}')"
+                    + " assigned. We'll skip this assignment. You can sync later on."
                 )
         try:
             self.client.roles.create(name=reference_obj.name, **args)
         except spl_context.HTTPError as error:
             logging.error(error)
 
-    def update(self, reference_obj, property):
-        # print(property)
-        old_value = self.client.roles[reference_obj.name]
-        new_value = reference_obj
-        try:
-            for item in property.split("."):
-                old_value = old_value[item]
-        except KeyError as wrong_key:
-            new_value = None
-            pass
-        try:
-            for item in property.split("."):
-                new_value = new_value[item]
-        except KeyError as wrong_key:
-            new_value = None
-        logging.info(
-            f"The {self.__name__} entity '{reference_obj.name}' changed at {property}"
-            + " from '{old_value}' to '{new_value}'."
-        )
+    def update(self, reference_obj, prop, simulate: bool = False):
+        if not self.check_update(
+            reference_obj=reference_obj,
+            prop=prop,
+            accessor=self.client.roles,
+            simulate=simulate,
+        ):
+            return
+        print("updating...")
+
+        # try:
+        #     self.client.roles.
+        # except spl_context.HTTPError as error:
+        #     logging.error(error)
+
+    def delete(self, name, simulate: bool = False):
+        pass
 
 
 class Users(ObjectList):
     def generate(self):
-        return [User(client=self.client, object=role) for role in self.client.roles.list()]
+        return [User(client=self.client, obj=role) for role in self.client.roles.list()]
 
     def list(self, details: bool = False):
         table = (
@@ -292,11 +370,11 @@ class Users(ObjectList):
             ignore_order=True,
         )
 
-    def create(self, reference_obj: spl_client.Role):
+    def create(self, reference_obj: spl_client.Role, simulate: bool = False):
         # print(reference_obj.__dict__)
         pass
 
-    def update(self, **kwargs):
+    def update(self, reference_obj, prop, simulate: bool = False):
         # print(kwargs)
         pass
 

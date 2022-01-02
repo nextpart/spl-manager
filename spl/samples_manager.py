@@ -13,6 +13,11 @@ from spl.connection_adapter import ConnectionAdapter
 
 
 class SamplesManager:
+    """[summary]
+
+    [extended_summary]
+    """
+
     def __init__(self, parent: object, path: Union[Path, str] = Path.cwd()):
         self._interactive = parent._interactive
         self._settings = parent._settings
@@ -83,11 +88,11 @@ class SamplesManager:
             path_candidates = path_candidates + list(
                 Path(self._work_dir).glob("**/SA-Eventgen/samples")
             )
-            path_candidates = path_candidates + list(
+            path_candidates = path_candidates + [
                 path
                 for path in Path(self._work_dir).glob("**/samples")
                 if "SA-Eventgen" not in str(path)
-            )
+            ]
             path = inquirer.select(
                 message="Select a targetdirectory:",
                 choices=[

@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 # %%
-import splunklib.client as spl_client
-from rich import inspect, print
+from rich import print
 
 from spl.__main__ import SplManager
 
@@ -101,14 +100,11 @@ client = spl.sync.dest.client
 client.namespace
 
 
-import splunklib.client as spl_client
-
 # %%
 # %%
-from rich import inspect, print
+from rich import print
 
 from spl.__main__ import SplManager
-from spl.objects import SplRole as Role
 from spl.objects import SplRoles as Roles
 
 spl = SplManager(src="nxtp-onprem", dest="localhost", interactive=False)

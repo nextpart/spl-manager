@@ -63,8 +63,8 @@ class AppsManager:
                         trusted_libs_manager=False,
                     )
                 )
-            except Exception:
-                pass
+            except Exception as exc:
+                self._log.warning(exc)
         return apps
 
     def __str__(self):
@@ -168,14 +168,13 @@ class AppsManager:
                     container_id = container["Id"]
                     self._log.info("Package container already exists.")
                     break
-            if container_id is not None:
-                if (
-                    not self._interactive
-                    or inquirer.confirm(
-                        message="Do you want to delete the old packaging container?", default=True
-                    ).execute()
-                ):
-                    self._docker.remove_container(container_id)
+            if container_id is not None and (
+                not self._interactive
+                or inquirer.confirm(
+                    message="Do you want to delete the old packaging container?", default=True
+                ).execute()
+            ):
+                self._docker.remove_container(container_id)
             container_id = self._docker.create_container(
                 name="splunk_package",
                 hostname="splunk_package",

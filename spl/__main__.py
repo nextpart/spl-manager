@@ -55,11 +55,11 @@ class SplManager:
             self._log.error(f"Settings validation failed with {validator.errors}")
             raise ValueError(f"Settings validation failed with {validator.errors}")
         # self.docker = DockerManager(self)
-        if not src is None and src in self._settings.CONNECTIONS.keys():
+        if src is not None and src in self._settings.CONNECTIONS:
             self._src = ConnectionAdapter(parent=self, name=src)
         else:
             self._src = None
-        if dest is not None and dest in self._settings.CONNECTIONS.keys():
+        if dest is not None and dest in self._settings.CONNECTIONS:
             self._dest = ConnectionAdapter(parent=self, name=dest)
             self.manager = self._dest
             # def manager(self):
@@ -73,6 +73,11 @@ class SplManager:
             )
 
     def docker(self) -> DockerManager:
+        """Docker container management for splunk local development.
+
+        Returns:
+            DockerManager: Splunk docker container management wrapper.
+        """
         return DockerManager(self)
 
     def samples(self, path: Union[Path, str] = Path.cwd()) -> SamplesManager:
@@ -103,6 +108,7 @@ class SplManager:
 
         Returns:
             AppsManager: Management interface/module for local apps.
+
         """
         return AppsManager(self, path=path, name=name)
 
@@ -122,4 +128,7 @@ class SplManager:
 
 # CLI Entrypoint:
 if __name__ == "__main__":
-    fire.Fire(name="spl", component=SplManager)
+    try:
+        fire.Fire(name="spl", component=SplManager)
+    except KeyboardInterrupt:
+        print("Bye! 🖖")

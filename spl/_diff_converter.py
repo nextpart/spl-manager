@@ -44,7 +44,8 @@ class DiffConverter:
             for item_path, value in diff["values_changed"].items():
                 entity_name, sanitized_path = DiffConverter._sanitize_item_path(str(item_path))
                 logging.info(
-                    f"Synchronizing entity '{entity_name}' with property '{sanitized_path}' to new value '{value['new_value']}'"
+                    f"Synchronizing entity '{entity_name}' with property '{sanitized_path}' to"
+                    + f" new value '{value['new_value']}'"
                 )
                 try:
                     self._sync_actions[sanitized_path](
@@ -52,7 +53,8 @@ class DiffConverter:
                     )
                 except KeyError:
                     logging.info(
-                        f"No action defined to update '{sanitized_path}' property for '{entity_name}' with new value '{value['new_value']}'"
+                        f"No action defined to update '{sanitized_path}' property for "
+                        + f"'{entity_name}' with new value '{value['new_value']}'"
                     )
 
         if "iterable_item_removed" in diff:

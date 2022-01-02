@@ -1,13 +1,9 @@
 # -*- coding: utf-8 -*-
-from datetime import datetime
 
 import splunklib.binding as spl_context
 import splunklib.client as spl_client
 from InquirerPy import inquirer
 from rich import inspect, print  # pylint: disable=W0622
-from rich.console import Console
-from rich.progress import track
-from rich.table import Column, Table
 
 from spl.objects import Apps, Indexes, Roles, Users
 

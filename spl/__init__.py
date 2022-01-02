@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Splunk Management Utility
+"""Splunk Management Utility.
 
 The library ``nextpart-splunk`` aka ``spl`` is a abstraction for splunk related
 development and maintenance operations. Providing you a single CLI or SDK brings
