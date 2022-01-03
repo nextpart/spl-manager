@@ -32,7 +32,6 @@ class ConnectionAdapter:
             username=self._settings.CONNECTIONS[name]["username"],
             password=self._settings.CONNECTIONS[name]["password"],
         )
-        # self.namespace(app, sharing, owner)
         self._log.info(
             f"Connection adapter for '{self._name}' ({self.client.authority})"
             + f" as user '{self.client.username}' with namespace: {self.client.namespace}."
@@ -149,61 +148,3 @@ class ConnectionAdapter:
             owner=owner,
         )
         return self.client.namespace
-
-    # def create_index(self, name: str = None, app=None, sharing=None, owner=None):
-    #     if name is None:
-    #         name = inquirer.text(message="Name of the index to create:").execute()
-    #     self.client.indexes.create(
-    #         name=name, namespace=self.namespace(app=app, sharing=sharing, owner=owner)
-    #     )
-
-    # def create_role(self, role):
-    #     args = {
-    #         field: role.content[field]
-    #         for field in role.fields["optional"]
-    #         if field in role.content
-    #         and role.content[field] is not None
-    #         and role.content[field] != "-1"
-    #         and field
-    #         not in [
-    #             "capabilities",
-    #         ]
-    #     }
-    #     args["capabilities"] = []
-    #     for capability in role.capabilities:
-    #         if capability in self.client.capabilities:
-    #             args["capabilities"].append(capability)
-    #         else:
-    #             self._log.warning(
-    #                 f"The role {role.name} has an unknown capability {capability}"
-    #                 + " assignes. We'll skip this assignment. You can sync later on."
-    #             )
-    #     try:
-    #         self.client.roles.create(name=role.name, **args)
-    #     except spl_context.HTTPError as error:
-    #         self._log.error(error)
-
-    # def update_role(self, **kwargs):
-    #     print(kwargs)
-    # args = {
-    #     field: role.content[field]
-    #     for field in role.fields["optional"]
-    #     if field in role.content
-    #     and role.content[field] is not None
-    #     and role.content[field] != "-1"
-    #     and field
-    #     not in [
-    #         "capabilities",
-    #     ]
-    # }
-    # args["capabilities"] = []
-    # for capability in role.capabilities:
-    #     if capability in self.client.capabilities:
-    #         args["capabilities"].append(capability)
-    #     else:
-    #         self._log.warning(f"The role {role.name} has an unknown capability {capability}"
-    #         + " assignes. We'll skip this assignment. You can sync later on.")
-    # try:
-    #     self.client.roles.create(name=role.name, **args)
-    # except spl_context.HTTPError as error:
-    #     self._log.error(error)
