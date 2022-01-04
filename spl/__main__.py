@@ -25,7 +25,14 @@ logging.basicConfig(level="INFO", format="%(message)s", datefmt="[%X]", handlers
 class SplManager:
     """Main Splunk manager object used by CLI or as SDK main."""
 
-    def __init__(self, interactive=True, level: str = "INFO", src: str = None, dest: str = None):
+    def __init__(
+        self,
+        interactive=True,
+        level: str = "INFO",
+        src: str = None,
+        dest: str = None,
+        context=False,
+    ):
         """Splunk management object initialization and module declaration.
 
         Args:
@@ -49,6 +56,7 @@ class SplManager:
             merge_enabled=True,
             settings_files=["settings.yaml", ".secrets.yaml"],
         )
+        self._context = context
         validator = Validator(schema=CONFIG_SCHEMA, allow_unknown=True, require_all=True)
         if validator.validate(self._settings.to_dict()):
             self._log.debug("Settings validated successfully.")
@@ -66,18 +74,20 @@ class SplManager:
             self._dest = None
 
         if self._src is not None and self._dest is not None:
+            self._src.namespace(context=self._context)
+            self._dest.namespace(context=self._context)
             self.sync = SyncManager(
                 self, interactive=self._interactive, src=self._src, dest=self._dest
             )
 
-    def manager(self, conn: str) -> ConnectionAdapter:
+    def manager(self, conn: str = "localhost") -> ConnectionAdapter:
         """Splunk connection management.
 
         Returns:
             ConnectionAdapter: Splunk connection wrapper.
         """
         conn_adapter = ConnectionAdapter(self, name=conn)
-        conn_adapter.namespace()
+        conn_adapter.namespace(context=self._context)
         return conn_adapter
 
     def docker(self) -> DockerManager:

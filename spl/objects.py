@@ -39,25 +39,77 @@ class ObjectList:
     def __init__(self, client: spl_client.Service, accessor, interactive=False):
         self.client = client
         self._interactive = interactive
-        self.accessor = accessor
+        self._accessor = accessor
         self.items = self.generate()
 
     def __str__(self):
         return str([str(item) for item in self.items])
 
     def generate(self):
-        return [self.SUBTYPE(client=self.client, obj=item) for item in self.accessor.list()]
+        return [
+            self.SUBTYPE(client=self.client, obj=item)
+            for item in self._accessor.list()
+            if not ("_state" in item.__dict__ and "access" in item.__dict__["_state"])
+            or (
+                (
+                    self.client.namespace["app"] is None
+                    or self.client.namespace["app"] == item.access.app
+                )
+                and (
+                    self.client.namespace["sharing"] is None
+                    or self.client.namespace["sharing"] == item.access.sharing
+                )
+                and (
+                    self.client.namespace["owner"] is None
+                    or self.client.namespace["owner"] == item.access.owner
+                )
+            )
+        ]
 
     @staticmethod
-    def _diff(src_client_accessor, dest_client_accessor) -> DeepDiff:
+    def _diff(src_client, src_client_accessor, dest_client, dest_client_accessor) -> DeepDiff:
         return DeepDiff(
             {
-                str(role.name): {"access": role.access, "content": role.content}
-                for role in src_client_accessor
+                str(item.name): {
+                    # "access": item.access, 
+                    "content": item.content}
+                for item in src_client_accessor
+                if not ("_state" in item.__dict__ and "access" in item.__dict__["_state"])
+                    or (
+                        (
+                            src_client.namespace["app"] is None
+                            or src_client.namespace["app"] == item.access.app
+                        )
+                        and (
+                            src_client.namespace["sharing"] is None
+                            or src_client.namespace["sharing"] == item.access.sharing
+                        )
+                        and (
+                            src_client.namespace["owner"] is None
+                            or src_client.namespace["owner"] == item.access.owner
+                        )
+                    )
             },
             {
-                str(role.name): {"access": role.access, "content": role.content}
-                for role in dest_client_accessor
+                str(item.name): {
+                    # "access": item.access, 
+                    "content": item.content}
+                for item in dest_client_accessor
+                if not ("_state" in item.__dict__ and "access" in item.__dict__["_state"])
+                    or (
+                        (
+                            dest_client.namespace["app"] is None
+                            or dest_client.namespace["app"] == item.access.app
+                        )
+                        and (
+                            dest_client.namespace["sharing"] is None
+                            or dest_client.namespace["sharing"] == item.access.sharing
+                        )
+                        and (
+                            dest_client.namespace["owner"] is None
+                            or dest_client.namespace["owner"] == item.access.owner
+                        )
+                    )
             },
             ignore_order=True,
         )
@@ -80,7 +132,7 @@ class ObjectList:
         )
         return True
 
-    def create(self, reference_obj, simulate: bool = False):
+    def _create(self, reference_obj, simulate: bool = False):
         if not self.check_create(reference_obj=reference_obj, simulate=simulate):
             return
         args = {
@@ -107,17 +159,17 @@ class ObjectList:
                     )
         try:
             if isinstance(reference_obj, spl_client.User):
-                self.accessor.create(
+                self._accessor.create(
                     reference_obj.name, password="mySplunkDevDefaultP4ssw0rd!", **args
                 )
             else:
-                self.accessor.create(reference_obj.name, **args)
+                self._accessor.create(reference_obj.name, **args)
         except spl_context.HTTPError as error:
             logging.error(error)
 
     def check_update(self, reference_obj, prop, simulate: bool = False):
         try:
-            old_value = self.accessor[reference_obj.name]
+            old_value = self._accessor[reference_obj.name]
             for item in prop.split("."):
                 old_value = old_value[item]
         except KeyError:
@@ -164,7 +216,7 @@ class ObjectList:
         )
         return True, new_value
 
-    def update(self, reference_obj, prop, simulate: bool = False):
+    def _update(self, reference_obj, prop, simulate: bool = False):
         update, new_value = self.check_update(
             reference_obj=reference_obj,
             prop=prop,
@@ -176,7 +228,7 @@ class ObjectList:
             f"Updating {self.__name__} on {self.client.host}: {prop.replace('content.','')}"
         )
         try:
-            self.accessor[reference_obj.name].update(**{prop.replace("content.", ""): new_value})
+            self._accessor[reference_obj.name].update(**{prop.replace("content.", ""): new_value})
         except spl_context.HTTPError as error:
             logging.error(error)
 
@@ -195,12 +247,12 @@ class ObjectList:
         logging.info(f"Deleting {self.__name__} entity '{name}'.")
         return True
 
-    def delete(self, name: str, simulate: bool = False):
+    def _delete(self, name: str, simulate: bool = False):
         if not self.check_delete(name=name, simulate=simulate):
             return
         logging.info(f"Deleting {self.__name__} '{name}' on {self.client.host}")
         try:
-            self.accessor.delete(name=name)
+            self._accessor.delete(name=name)
         except spl_context.HTTPError as error:
             logging.error(error)
 
@@ -211,7 +263,7 @@ class ObjectList:
                 title=f"{self.__name__} Overview",
                 show_lines=False,
             )
-        elif "access" not in self.accessor.list()[0].__dict__["_state"]:
+        elif "access" not in self._accessor.list()[0].__dict__["_state"]:
             table = Table(
                 *self.SUBTYPE.DETAIL_FIELDS.keys(),
                 title=f"{self.__name__} Overview",
@@ -226,7 +278,24 @@ class ObjectList:
                 title=f"{self.__name__} Overview",
                 show_lines=False,
             )
-        for item in track(self.accessor.list()):
+        for item in track(self._accessor.list()):
+            # Context based selection
+            if ("_state" in item.__dict__ and "access" in item.__dict__["_state"]) and (
+                (
+                    self.client.namespace["app"] is not None
+                    and self.client.namespace["app"] != item.access.app
+                )
+                or (
+                    self.client.namespace["sharing"] is not None
+                    and self.client.namespace["sharing"] != item.access.sharing
+                )
+                or (
+                    self.client.namespace["owner"] is not None
+                    and self.client.namespace["owner"] != item.access.owner
+                )
+            ):
+                continue
+
             row = [item.name]
             fields = (
                 self.SUBTYPE.DETAIL_FIELDS.items()
@@ -256,6 +325,8 @@ class ObjectList:
                             printable = True
                         elif val.startswith("last_"):
                             printable = datetime.utcfromtimestamp(printable).strftime(TIME_FORMAT)
+                    elif isinstance(printable, str):
+                        printable.encode("ascii")
                     row.append(str(printable))
                 except:
                     row.append("")
@@ -300,8 +371,10 @@ class Users(ObjectList):
     @staticmethod
     def diff(src_client, dest_client) -> DeepDiff:
         return ObjectList._diff(
-            src_client_accessor=src_client.client.users.list(),
-            dest_client_accessor=dest_client.client.users.list(),
+            src_client = src_client,
+            src_client_accessor=src_client.users.list(),
+            dest_client = dest_client,
+            dest_client_accessor=dest_client.users.list(),
         )
 
 
@@ -310,17 +383,18 @@ class Index(Object):
     OVERVIEW_FIELDS = {
         "Name": None,
         "Type": "datatype",
+        "Size MB": "maxTotalDataSizeMB",
     }
     DETAIL_FIELDS = {
         **OVERVIEW_FIELDS,
         **{
             "Path": "homePath",
             "Integrity": "enableDataIntegrityControl",
-            "Size MB": "maxTotalDataSizeMB",
             "Buckets MB": "maxDataSize",
             "Tsidx Optimization": "enableTsidxReduction",
         },
     }
+    SYNC_EXCLUDE = []
     __name__ = "Index"
 
 
@@ -331,8 +405,10 @@ class Indexes(ObjectList):
     @staticmethod
     def diff(src_client, dest_client) -> DeepDiff:
         return ObjectList._diff(
-            src_client_accessor=src_client.client.indexes.list(),
-            dest_client_accessor=dest_client.client.indexes.list(),
+            src_client = src_client,
+            src_client_accessor=src_client.indexes.list(),
+            dest_client = dest_client,
+            dest_client_accessor=dest_client.indexes.list(),
         )
 
 
@@ -349,6 +425,7 @@ class App(Object):
             "Nav": "show_in_nav",
         },
     }
+    SYNC_EXCLUDE = []
     __name__ = "App"
 
 
@@ -359,8 +436,10 @@ class Apps(ObjectList):
     @staticmethod
     def diff(src_client, dest_client) -> DeepDiff:
         return ObjectList._diff(
-            src_client_accessor=src_client.client.apps.list(),
-            dest_client_accessor=dest_client.client.apps.list(),
+            src_client = src_client,
+            src_client_accessor=src_client.apps.list(),
+            dest_client = dest_client,
+            dest_client_accessor=dest_client.apps.list(),
         )
 
 
@@ -380,6 +459,7 @@ class Role(Object):
             "Search earliest": "srchTimeEarliest",
         },
     }
+    SYNC_EXCLUDE = []
     __name__ = "Role"
 
 
@@ -390,8 +470,10 @@ class Roles(ObjectList):
     @staticmethod
     def diff(src_client, dest_client) -> DeepDiff:
         return ObjectList._diff(
-            src_client_accessor=src_client.client.roles.list(),
-            dest_client_accessor=dest_client.client.roles.list(),
+            src_client = src_client,
+            src_client_accessor=src_client.roles.list(),
+            dest_client = dest_client,
+            dest_client_accessor=dest_client.roles.list(),
         )
 
 
@@ -399,11 +481,15 @@ class EventType(Object):
 
     OVERVIEW_FIELDS = {
         "Name": None,
+        "App": "eai:appName",
+        # "Search": "search",
+        "Tags": "tags",
     }
     DETAIL_FIELDS = {
         **OVERVIEW_FIELDS,
-        **{},
+        **{"Description": "description", "Disabled": "disabled", "Priority": "priority"},
     }
+    SYNC_EXCLUDE = []
     __name__ = "EventType"
 
 
@@ -414,20 +500,25 @@ class EventTypes(ObjectList):
     @staticmethod
     def diff(src_client, dest_client) -> DeepDiff:
         return ObjectList._diff(
-            src_client_accessor=src_client.client.event_types.list(),
-            dest_client_accessor=dest_client.client.event_types.list(),
+            src_client = src_client,
+            src_client_accessor=src_client.event_types.list(),
+            dest_client = dest_client,
+            dest_client_accessor=dest_client.event_types.list(),
         )
 
 
 class SavedSearch(Object):
 
-    OVERVIEW_FIELDS = {
-        "Name": None,
-    }
+    OVERVIEW_FIELDS = {"Name": None, "Search": "search"}
     DETAIL_FIELDS = {
         **OVERVIEW_FIELDS,
-        **{},
+        **{
+            "Visible": "is_visible",
+            "Disabled": "disabled",
+            "Scheduled": "is_scheduled",
+        },
     }
+    SYNC_EXCLUDE = []
     __name__ = "SavedSearch"
 
 
@@ -438,8 +529,10 @@ class SavedSearches(ObjectList):
     @staticmethod
     def diff(src_client, dest_client) -> DeepDiff:
         return ObjectList._diff(
-            src_client_accessor=src_client.client.saved_searches.list(),
-            dest_client_accessor=dest_client.client.saved_searches.list(),
+            src_client = src_client,
+            src_client_accessor=src_client.saved_searches.list(),
+            dest_client = dest_client,
+            dest_client_accessor=dest_client.saved_searches.list(),
         )
 
 
@@ -452,6 +545,7 @@ class Input(Object):
         **OVERVIEW_FIELDS,
         **{},
     }
+    SYNC_EXCLUDE = []
     __name__ = "Input"
 
 
@@ -462,6 +556,8 @@ class Inputs(ObjectList):
     @staticmethod
     def diff(src_client, dest_client) -> DeepDiff:
         return ObjectList._diff(
-            src_client_accessor=src_client.client.inputs.list(),
-            dest_client_accessor=dest_client.client.inputs.list(),
+            src_client = src_client,
+            src_client_accessor=src_client.inputs.list(),
+            dest_client = dest_client,
+            dest_client_accessor=dest_client.inputs.list(),
         )

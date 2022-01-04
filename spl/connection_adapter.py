@@ -89,6 +89,7 @@ class ConnectionAdapter:
 
     def namespace(
         self,
+        context: bool,
         app: Optional[str] = None,  # "system",
         sharing: Optional[str] = None,  # "system",
         owner: Optional[str] = None,  # "admin",
@@ -96,6 +97,7 @@ class ConnectionAdapter:
         """Namespace context for splunk interaction.
 
         Args:
+            context (bool): Whether or not to ask for context input.
             app ([type], optional): [description]. Defaults to None.
             sharing ([type], optional): [description]. Defaults to None.
             owner ([type], optional): [description]. Defaults to None.
@@ -104,47 +106,47 @@ class ConnectionAdapter:
             ValueError: [description]
 
         """
-        if app not in [app.name for app in self.client.apps.list()]:
-            app = None
-        if self._interactive and app is None:
+        if context:
+            self._log.info(f"Determining namespace/context for connection '{self._name}'")
+        app_list = [None] + [
+            app.name for app in self.client.apps.list() if app.content.disabled != "1"
+        ]
+        owner_list = [None, "nobody"] + [user.name for user in self.client.users.list()]
+        sharing_list = [None, "global", "system", "app", "user"]
+        if context and self._interactive and app is None:
             self.app = inquirer.select(
-                message="Select an application context:",
-                choices=["system"]
-                + [
-                    app.name
-                    for app in self.client.apps.list()
-                    if app.name not in self._settings.APPS.exclude
-                ],
-                default="system",
+                message=f"Select an application context for {self._name}:",
+                choices=app_list,
+                default=None,
             ).execute()
-        elif app is None:
-            self.app = "system"
-        elif app not in [app.name for app in self.client.apps.list()]:
+        elif app not in app_list:
             raise ValueError(f"Application '{app}' does not exist")
-        if self._interactive and sharing is None:
+        else:
+            self.app = app
+        if context and self._interactive and sharing is None:
             self.sharing = inquirer.select(
                 message="Select a sharing level:",
-                choices=["global", "system", "app", "user"],
-                default="system",
+                choices=sharing_list,
+                default=None,
             ).execute()
-        elif sharing is None:
-            self.sharing = "system"
-        elif sharing not in ["global", "system", "app", "user"]:
+        elif sharing not in sharing_list:
             raise ValueError("Invalid sharing mode")
-        if self._interactive and owner is None:
+        else:
+            self.sharing = sharing
+
+        if context and self._interactive and owner is None:
             self.owner = inquirer.select(
                 message="Select an owner:",
-                choices=[user.name for user in self.client.users.list()],
-                default="admin",
+                choices=owner_list,
+                default=None,
             ).execute()
-        elif owner is None:
-            self.owner = "admin"
-        elif owner not in [user.name for user in self.client.users.list()]:
+        elif owner not in owner_list:
             raise ValueError("User does not exist")
-        # if self.sharing != sharing or self.owner != owner or self.app != app:
+        else:
+            self.owner = owner
         self.client.namespace = spl_context.namespace(
-            sharing=sharing,
-            app=app,
-            owner=owner,
+            sharing=self.sharing,
+            app=self.app,
+            owner=self.owner,
         )
         return self.client.namespace

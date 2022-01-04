@@ -37,9 +37,9 @@ class SyncManager:
             accessor=self.src.client.roles,
             subject=spl_client.Role,
             actions={
-                "create": self.dest.roles.create,
-                "delete": self.dest.roles.delete,
-                "*": self.dest.roles.update,
+                "create": self.dest.roles._create,
+                "delete": self.dest.roles._delete,
+                "*": self.dest.roles._update,
             },
         ).sync(create=create, update=update, delete=delete, simulate=simulate)
 
@@ -56,9 +56,9 @@ class SyncManager:
             subject=spl_client.User,
             accessor=self.src.client.users,
             actions={
-                "create": self.dest.users.create,
-                "delete": self.dest.users.update,
-                "*": self.dest.users.update,
+                "create": self.dest.users._create,
+                "delete": self.dest.users._delete,
+                "*": self.dest.users._update,
             },
         ).sync(create=create, update=update, delete=delete, simulate=simulate)
 
@@ -75,9 +75,9 @@ class SyncManager:
             subject=spl_client.Index,
             accessor=self.src.client.indexes,
             actions={
-                "create": self.dest.indexes.create,
-                "delete": self.dest.indexes.update,
-                "*": self.dest.indexes.update,
+                "create": self.dest.indexes._create,
+                "delete": self.dest.indexes._delete,
+                "*": self.dest.indexes._update,
             },
         ).sync(create=create, update=update, delete=delete, simulate=simulate)
 
@@ -94,9 +94,9 @@ class SyncManager:
             subject=spl_client.Application,
             accessor=self.src.client.apps,
             actions={
-                "create": self.dest.apps.create,
-                "delete": self.dest.apps.delete,
-                "*": self.dest.apps.update,
+                "create": self.dest.apps._create,
+                "delete": self.dest.apps._delete,
+                "*": self.dest.apps._update,
             },
         ).sync(create=create, update=update, delete=delete, simulate=simulate)
 
@@ -113,9 +113,9 @@ class SyncManager:
             subject=spl_client.EventType,
             accessor=self.src.client.event_types,
             actions={
-                "create": self.dest.event_types.create,
-                "delete": self.dest.event_types.update,
-                "*": self.dest.event_types.update,
+                "create": self.dest.event_types._create,
+                "delete": self.dest.event_types._delete,
+                "*": self.dest.event_types._update,
             },
         ).sync(create=create, update=update, delete=delete, simulate=simulate)
 
@@ -132,9 +132,9 @@ class SyncManager:
             subject=spl_client.SavedSearches,
             accessor=self.src.client.saved_searches,
             actions={
-                "create": self.dest.saved_searches.create,
-                "delete": self.dest.saved_searches.update,
-                "*": self.dest.saved_searches.update,
+                "create": self.dest.saved_searches._create,
+                "delete": self.dest.saved_searches._delete,
+                "*": self.dest.saved_searches._update,
             },
         ).sync(create=create, update=update, delete=delete, simulate=simulate)
 
@@ -151,9 +151,9 @@ class SyncManager:
             subject=spl_client.Inputs,
             accessor=self.src.client.inputs,
             actions={
-                "create": self.dest.inputs.create,
-                "delete": self.dest.inputs.update,
-                "*": self.dest.inputs.update,
+                "create": self.dest.inputs._create,
+                "delete": self.dest.inputs._delete,
+                "*": self.dest.inputs._update,
             },
         ).sync(create=create, update=update, delete=delete, simulate=simulate)
 
@@ -184,16 +184,17 @@ class SyncManager:
             simulate: bool = simulate,
         ):
             self.simulate = simulate
-            self.diff = self._diff_gen(self.src, self.dest)
+            self.diff = self._diff_gen(self.src.client, self.dest.client)
+            print(self.diff)
             if create:
                 self._create()
-                self.diff = self._diff_gen(self.src, self.dest)
+                self.diff = self._diff_gen(self.src.client, self.dest.client)
             if update:
                 self._update()
-                self.diff = self._diff_gen(self.src, self.dest)
+                self.diff = self._diff_gen(self.src.client, self.dest.client)
             if delete:
                 self._delete()
-                self.diff = self._diff_gen(self.src, self.dest)
+                self.diff = self._diff_gen(self.src.client, self.dest.client)
 
         def _create(self):
             """Sync completely missing entities (i.e. User, Index, ...)."""
@@ -218,11 +219,6 @@ class SyncManager:
                         choices=items,
                     ).execute()
                 for item in items:
-                    # if self.simulate:
-                    #     self._log.info(
-                    #         f"Simulated creation of '{self.subject.__name__}' for '{item}'."
-                    #     )
-                    #     continue
                     self._sync_actions["create"](
                         reference_obj=self.accessor[item], simulate=self.simulate
                     )
@@ -248,12 +244,6 @@ class SyncManager:
                         choices=items,
                     ).execute()
                 for item in items:
-                    # if self.simulate:
-                    #     self._log.info(
-                    #         f"Simulated removal of '{self.subject.__name__}' for '{item}'."
-                    #     )
-                    #     continue
-                    # self._log.info(f"Triggering removal of '{self.subject.__name__}' for '{item}'.")
                     self._sync_actions["delete"](name=item, simulate=self.simulate)
 
         def _update(self):
@@ -261,6 +251,7 @@ class SyncManager:
             for mode in [
                 "dictionary_item_added",
                 "dictionary_item_removed",
+                "iterable_item_removed",
                 "values_changed",
                 "type_changes",
             ]:
@@ -287,18 +278,7 @@ class SyncManager:
                                 + f" '{entity_name}'."
                             )
                             continue
-
-                        # if self.simulate:
-                        #     self._log.info(
-                        #         f"Simulated modify of '{self.subject.__name__}' property "
-                        #         + f"'{print_path}' for '{entity_name}'."
-                        #     )
-                        #     continue
                         if sanitized_path in self._sync_actions or "*" in self._sync_actions:
-                            # self._log.info(
-                            #     f"Synchronizing entity '{entity_name}' property '{print_path}'"
-                            #     + f" for '{entity_name}' due to change '{mode.replace('_',' ')}'."
-                            # )
                             try:
                                 self._sync_actions[
                                     sanitized_path if sanitized_path in self._sync_actions else "*"

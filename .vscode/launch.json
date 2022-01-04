@@ -24,6 +24,15 @@
       "request": "launch",
       "module": "spl",
       "args": ["manager", "--conn=\"nxtp-onprem\"", "apps", "list"]
+    },
+    {
+      "name": "spl manager --conn='nxtp-onprem' event_types list",
+      "type": "python",
+      "request": "launch",
+      "module": "spl",
+      "args": ["manager", "--conn='nxtp-onprem'", "event_types", "list"]
     }
+
+    
   ]
 }

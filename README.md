@@ -13,8 +13,8 @@ This library is an abstraction for Splunk-related development, maintenance, or m
 ├── dist                          # Place for built packages and reports 
 ├── scripts                       
 ├── config                        # Settings and secrets
-│   └── settings.yaml             # 
-│   └── .secrets.yaml             # 
+│   └── settings.yaml             # General purpose settings for this lib
+│   └── .secrets.yaml             # API settings for connections and secrets
 └── share                         # Custom splunkbase or builtin app content
 ```
 

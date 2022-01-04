@@ -63,6 +63,10 @@ print(
     ],
 )
 print("Saved search properties: ", spl.sync.src.client.saved_searches["User Add"].__dict__)
+
+# %%
+spl.sync.src.namespace(sharing="app", owner="admin", app="Splunk_TA_windows", context=False)
+
 # %%
 print(
     "Event types: ",
@@ -72,7 +76,8 @@ print(
         if not event_type.name.startswith("_")
     ],
 )
-print("Event type properties: ", spl.sync.src.client.event_types["linux_audit_anomalies"].content)
+print("Event type properties: ", spl.sync.src.client.event_types["linux_audit_anomalies"].__dict__)
+
 # %%
 print("Capabilities: ", spl.sync.src.client.capabilities)
 
@@ -104,14 +109,40 @@ client.namespace
 # %%
 # %%
 from rich import print
-
+import splunklib.binding as spl_context
 from spl.__main__ import SplManager
-from spl.objects import SplRoles as Roles
+from spl.objects import Roles
 
 spl = SplManager(src="nxtp-onprem", dest="localhost", interactive=False)
-client = spl.sync.dest.client
+client = spl.sync.src.client
+default_namespace = client.namespace
+
 
 # %%
-roles = Roles.generate(client)
-print([str(role) for role in roles])
+sync = spl.sync
+
+# %%
+manager = spl.manager(conn="nxtp-onprem")
+
+# %%
+manager.namespace(context=True, app="Splunk_SOCToolkit")
+
+
+# %%
+manager.saved_searches.generate()
+
+# %%
+client.namespace = default_namespace
+
+# %%
+client.namespace = spl_context.namespace(
+            sharing="app",
+            app="Splunk_SOCToolkit",
+            owner=None,
+        )
+
+# %%
+print([saved_search.name for saved_search in client.saved_searches.list() if saved_search.access.app == "Splunk_SOCToolkit"])
+
+
 # %%
