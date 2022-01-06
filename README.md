@@ -4,7 +4,7 @@ This library is an abstraction for Splunk-related development, maintenance, or m
 
 ## Motivation
 
-
+When I work with Splunk, my working directory is usually in the same layout. I work with a mono-repository or a higher-level one with submodules, which contains several applications and configuration. This can look generalized like this:
 
 ```
 <Development Repository>
@@ -18,42 +18,56 @@ This library is an abstraction for Splunk-related development, maintenance, or m
 └── share                         # Custom splunkbase or builtin app content
 ```
 
+We have all found our ways and methods to develop applications on an instance and to configure and operate that instance to meet our needs and/or those of our customers. But what is usually rather painful is when we then need them on other instances as well. A good example are test instances, which should be as close to production as possible. However, in the last few years that I have been dealing as a user with Splunk, some needs for simplified handling and automation have emerged that I would like to address here.
+
 ### We want to ...
 
-* Spin up a local development container:
+- Spin up a local development container:
   ```bash
   spl docker start
   ```
-* Put my local application(s) there for testing purposes:
+
+- Put my local application(s) there for testing purposes:
   ```bash
   spl docker upload --app="Defender*"
   ```
-* Get sample data for Eventgen:
+
+- Get sample data for Eventgen:
   ```bash
   spl --src="onprem"  samples --path="./apps/SA-Eventgen" download --name="WinDefender"
   ```
-* Download apps from development container to local folder:
+
+- (De)activate streaming of event data.
+
+- Download apps from development container to local folder:
   ```bash
   spl docker download --app="Defender*"
   ```
-* Run AppInspect, Packaging, etc.:
+
+- Run AppInspect, Packaging, etc.:
   ```bash
   spl apps --name="Defender_TA*" validate
   ```
-* List various objects on an instance:
+
+- List various objects on an instance:
   ```bash
   spl manager --conn="onprem" users list
   ```
-* Create or modify objects on an instance:
+
+- Create or modify objects on an instance:
   ```bash
   spl manager --conn="onprem" roles update --name "investigator"
   ```
-* Sync objects and their properties from one instance to another:
+
+- Sync objects and their properties from one instance to another:
   ```bash
   spl --src="onprem" --dest="localhost" sync users --create --update
   ```
 
+
 and probably much more, so pull requests are welcome!
+
+
 
 ## Getting Started
 
@@ -93,14 +107,14 @@ If you wish to get more information about any command within `spl`, you can pass
 
 ### Top-level `spl` Modules
 
-- `connections` provides you a list of connections in the configuration.
+- `connections` provides you a list of connections available via configuration.
 
-- `docker` helps you to manage the local splunk container instance.
+- `docker` helps you to manage the local splunk container instance. 
 
 - `apps` abstracts the handling of local application folders at a given `--path` and
   helps with validation, packaging, vetting, etc.
 
-- `samples` are based on the configured queries for a `--connection` or `--src` and can
+- `samples` are based on the configured queries for a `--conn` or `--src` and can
   download results and store them automatically at a `--path` to use for _SA-Eventgen_.
 
 - `manager` acts as a direct `ConnectionAdapter` interface for the specified `--conn`

@@ -5,7 +5,7 @@ import logging
 from pathlib import Path
 from time import sleep
 from typing import Optional, Union
-
+import os
 import docker
 import requests
 import splunk_appinspect
@@ -37,6 +37,7 @@ class AppsManager:
         self._log = parent._log
         self._interactive = parent._interactive
         self._work_dir = path.resolve().absolute()
+        print(self._work_dir)
         self._docker = docker.APIClient(base_url=self._settings.DOCKER.SOCKET)
         if not name:
             self._paths = list(
@@ -179,7 +180,7 @@ class AppsManager:
                 name="splunk_package",
                 hostname="splunk_package",
                 image=self.package_image()["Id"],
-                environment=["APP_DIR=/apps", "PKG_DIR=/dist"],
+                environment=["APP_DIR=/apps", "PKG_DIR=/dist", f"MYUSER={os.getuid()}"],
                 volumes=[f"/apps/{app_path.name}", "/dist"],
                 host_config=self._docker.create_host_config(
                     binds={
@@ -261,21 +262,21 @@ class AppsManager:
             fields = {}
             with open(package, "rb") as package_file:
                 fields.update({"app_package": (package.name, package_file)})
-            fields.update(
-                {
-                    "included_tags": "cloud",
+                fields.update(
+                    {
+                        "included_tags": "cloud",
+                    }
+                )
+                payload = MultipartEncoder(fields=fields)
+                headers = {
+                    "Authorization": f"bearer {user_token}",
+                    "Content-Type": payload.content_type,
                 }
-            )
-            payload = MultipartEncoder(fields=fields)
-            headers = {
-                "Authorization": f"bearer {user_token}",
-                "Content-Type": payload.content_type,
-            }
-            response = requests.post(
-                url=(self._settings.SPLUNKBASE.appinspect_uri + "/validate"),
-                data=payload,
-                headers=headers,
-            ).json()
+                response = requests.post(
+                    url=(self._settings.SPLUNKBASE.appinspect_uri + "/validate"),
+                    data=payload,
+                    headers=headers,
+                ).json()
             self._log.info(f"Got response for '{app_name}': " + response.get("message"))
             if "request_id" not in response.keys():
                 self._log.error(f"Failed to create cloud vetting job fir {app_name}.")

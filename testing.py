@@ -106,10 +106,12 @@ client = spl.sync.dest.client
 client.namespace
 
 
+import splunklib.binding as spl_context
+
 # %%
 # %%
 from rich import print
-import splunklib.binding as spl_context
+
 from spl.__main__ import SplManager
 from spl.objects import Roles
 
@@ -136,13 +138,19 @@ client.namespace = default_namespace
 
 # %%
 client.namespace = spl_context.namespace(
-            sharing="app",
-            app="Splunk_SOCToolkit",
-            owner=None,
-        )
+    sharing="app",
+    app="Splunk_SOCToolkit",
+    owner=None,
+)
 
 # %%
-print([saved_search.name for saved_search in client.saved_searches.list() if saved_search.access.app == "Splunk_SOCToolkit"])
+print(
+    [
+        saved_search.name
+        for saved_search in client.saved_searches.list()
+        if saved_search.access.app == "Splunk_SOCToolkit"
+    ]
+)
 
 
 # %%
