@@ -2,10 +2,11 @@
 import csv
 import json
 import logging
+import os
 from pathlib import Path
 from time import sleep
 from typing import Optional, Union
-import os
+
 import docker
 import requests
 import splunk_appinspect

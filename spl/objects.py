@@ -71,45 +71,47 @@ class ObjectList:
         return DeepDiff(
             {
                 str(item.name): {
-                    # "access": item.access, 
-                    "content": item.content}
+                    # "access": item.access,
+                    "content": item.content
+                }
                 for item in src_client_accessor
                 if not ("_state" in item.__dict__ and "access" in item.__dict__["_state"])
-                    or (
-                        (
-                            src_client.namespace["app"] is None
-                            or src_client.namespace["app"] == item.access.app
-                        )
-                        and (
-                            src_client.namespace["sharing"] is None
-                            or src_client.namespace["sharing"] == item.access.sharing
-                        )
-                        and (
-                            src_client.namespace["owner"] is None
-                            or src_client.namespace["owner"] == item.access.owner
-                        )
+                or (
+                    (
+                        src_client.namespace["app"] is None
+                        or src_client.namespace["app"] == item.access.app
                     )
+                    and (
+                        src_client.namespace["sharing"] is None
+                        or src_client.namespace["sharing"] == item.access.sharing
+                    )
+                    and (
+                        src_client.namespace["owner"] is None
+                        or src_client.namespace["owner"] == item.access.owner
+                    )
+                )
             },
             {
                 str(item.name): {
-                    # "access": item.access, 
-                    "content": item.content}
+                    # "access": item.access,
+                    "content": item.content
+                }
                 for item in dest_client_accessor
                 if not ("_state" in item.__dict__ and "access" in item.__dict__["_state"])
-                    or (
-                        (
-                            dest_client.namespace["app"] is None
-                            or dest_client.namespace["app"] == item.access.app
-                        )
-                        and (
-                            dest_client.namespace["sharing"] is None
-                            or dest_client.namespace["sharing"] == item.access.sharing
-                        )
-                        and (
-                            dest_client.namespace["owner"] is None
-                            or dest_client.namespace["owner"] == item.access.owner
-                        )
+                or (
+                    (
+                        dest_client.namespace["app"] is None
+                        or dest_client.namespace["app"] == item.access.app
                     )
+                    and (
+                        dest_client.namespace["sharing"] is None
+                        or dest_client.namespace["sharing"] == item.access.sharing
+                    )
+                    and (
+                        dest_client.namespace["owner"] is None
+                        or dest_client.namespace["owner"] == item.access.owner
+                    )
+                )
             },
             ignore_order=True,
         )
@@ -371,9 +373,9 @@ class Users(ObjectList):
     @staticmethod
     def diff(src_client, dest_client) -> DeepDiff:
         return ObjectList._diff(
-            src_client = src_client,
+            src_client=src_client,
             src_client_accessor=src_client.users.list(),
-            dest_client = dest_client,
+            dest_client=dest_client,
             dest_client_accessor=dest_client.users.list(),
         )
 
@@ -405,9 +407,9 @@ class Indexes(ObjectList):
     @staticmethod
     def diff(src_client, dest_client) -> DeepDiff:
         return ObjectList._diff(
-            src_client = src_client,
+            src_client=src_client,
             src_client_accessor=src_client.indexes.list(),
-            dest_client = dest_client,
+            dest_client=dest_client,
             dest_client_accessor=dest_client.indexes.list(),
         )
 
@@ -436,9 +438,9 @@ class Apps(ObjectList):
     @staticmethod
     def diff(src_client, dest_client) -> DeepDiff:
         return ObjectList._diff(
-            src_client = src_client,
+            src_client=src_client,
             src_client_accessor=src_client.apps.list(),
-            dest_client = dest_client,
+            dest_client=dest_client,
             dest_client_accessor=dest_client.apps.list(),
         )
 
@@ -470,9 +472,9 @@ class Roles(ObjectList):
     @staticmethod
     def diff(src_client, dest_client) -> DeepDiff:
         return ObjectList._diff(
-            src_client = src_client,
+            src_client=src_client,
             src_client_accessor=src_client.roles.list(),
-            dest_client = dest_client,
+            dest_client=dest_client,
             dest_client_accessor=dest_client.roles.list(),
         )
 
@@ -500,9 +502,9 @@ class EventTypes(ObjectList):
     @staticmethod
     def diff(src_client, dest_client) -> DeepDiff:
         return ObjectList._diff(
-            src_client = src_client,
+            src_client=src_client,
             src_client_accessor=src_client.event_types.list(),
-            dest_client = dest_client,
+            dest_client=dest_client,
             dest_client_accessor=dest_client.event_types.list(),
         )
 
@@ -529,9 +531,9 @@ class SavedSearches(ObjectList):
     @staticmethod
     def diff(src_client, dest_client) -> DeepDiff:
         return ObjectList._diff(
-            src_client = src_client,
+            src_client=src_client,
             src_client_accessor=src_client.saved_searches.list(),
-            dest_client = dest_client,
+            dest_client=dest_client,
             dest_client_accessor=dest_client.saved_searches.list(),
         )
 
@@ -556,8 +558,8 @@ class Inputs(ObjectList):
     @staticmethod
     def diff(src_client, dest_client) -> DeepDiff:
         return ObjectList._diff(
-            src_client = src_client,
+            src_client=src_client,
             src_client_accessor=src_client.inputs.list(),
-            dest_client = dest_client,
+            dest_client=dest_client,
             dest_client_accessor=dest_client.inputs.list(),
         )

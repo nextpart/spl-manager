@@ -127,7 +127,7 @@ default:
         version: 1.6.1
   docker:
     socket: unix://var/run/docker.sock
-    image: splunk/splunk:8.1-debian
+    image: splunk/splunk:8.2.4
     package_image: nextpartdev.azurecr.io/splunk/package:dev
     environment:
       SPLUNK_START_ARGS: --accept-license

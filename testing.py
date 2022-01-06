@@ -113,7 +113,6 @@ import splunklib.binding as spl_context
 from rich import print
 
 from spl.__main__ import SplManager
-from spl.objects import Roles
 
 spl = SplManager(src="nxtp-onprem", dest="localhost", interactive=False)
 client = spl.sync.src.client
