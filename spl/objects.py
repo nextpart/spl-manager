@@ -6,7 +6,8 @@ import splunklib.binding as spl_context
 import splunklib.client as spl_client
 from deepdiff import DeepDiff
 from InquirerPy import inquirer
-from rich import inspect, print  # pylint: disable=W0622
+
+# from rich import inspect, print  # pylint: disable=W0622
 from rich.console import Console
 from rich.progress import track
 from rich.table import Table
@@ -37,6 +38,13 @@ class ObjectList:
     __name__ = SUBTYPE.__name__
 
     def __init__(self, client: spl_client.Service, accessor, interactive=False):
+        """[summary]
+
+        Args:
+            client (spl_client.Service): The splunk service connection client in use.
+            accessor (object): Property object access, like a splunklib.client.User
+            interactive (bool, optional): Interactive CLI user questionary. Defaults to False.
+        """
         self.client = client
         self._interactive = interactive
         self._accessor = accessor
@@ -45,7 +53,12 @@ class ObjectList:
     def __str__(self):
         return str([str(item) for item in self.items])
 
-    def generate(self):
+    def generate(self) -> list:
+        """Object list generator.
+
+        Returns:
+            list: List with subtypes incl. content list from remote.
+        """
         return [
             self.SUBTYPE(client=self.client, obj=item)
             for item in self._accessor.list()
@@ -68,6 +81,17 @@ class ObjectList:
 
     @staticmethod
     def _diff(src_client, src_client_accessor, dest_client, dest_client_accessor) -> DeepDiff:
+        """Differencial comparison of object lists from two instances.
+
+        Args:
+            src_client (spl.connection_adapter.ConnectionAdapter): [description]
+            src_client_accessor (Any): Property object access, like splunklib.client.users
+            dest_client (spl.connection_adapter.ConnectionAdapter): [description]
+            dest_client_accessor (Any): Property object access, like splunklib.client.users
+
+        Returns:
+            DeepDiff: Source and destination object property list comparison
+        """
         return DeepDiff(
             {
                 str(item.name): {
@@ -116,7 +140,16 @@ class ObjectList:
             ignore_order=True,
         )
 
-    def check_create(self, reference_obj, simulate: bool = False):
+    def check_create(self, reference_obj, simulate: bool = False) -> bool:
+        """Object item creation verification by user/args or simulation.
+
+        Args:
+            reference_obj (Any): Reference object, like a splunklib.client.User
+            simulate (bool, optional): Whether to simulate action or not. Defaults to False.
+
+        Returns:
+            bool: Evaluation result if operation should be performed.
+        """
         if (
             self._interactive
             and not inquirer.confirm(
@@ -156,8 +189,8 @@ class ObjectList:
                     args["capabilities"].append(capability)
                 else:
                     logging.warning(
-                        f"The {self.__name__} {reference_obj.name} has an unknown capability ('{capability}')"
-                        + " assigned. We'll skip this assignment. You can sync later on."
+                        f"The {self.__name__} {reference_obj.name} has an unknown capability "
+                        + " ('{capability}') assigned. We'll skip this assignment."
                     )
         try:
             if isinstance(reference_obj, spl_client.User):
@@ -235,6 +268,15 @@ class ObjectList:
             logging.error(error)
 
     def check_delete(self, name: str, simulate: bool = False):
+        """Object item deletion verification by user/args or simulation.
+
+        Args:
+            name (str): Object name that should be deleted.
+            simulate (bool, optional): Whether to simulate action or not. Defaults to False.
+
+        Returns:
+            bool: Evaluation result if operation should be performed.
+        """
         if (
             self._interactive
             and not inquirer.confirm(
@@ -250,6 +292,12 @@ class ObjectList:
         return True
 
     def _delete(self, name: str, simulate: bool = False):
+        """[summary]
+
+        Args:
+            name (str): Object name that should be deleted.
+            simulate (bool, optional): Whether to simulate action or not. Defaults to False.
+        """
         if not self.check_delete(name=name, simulate=simulate):
             return
         logging.info(f"Deleting {self.__name__} '{name}' on {self.client.host}")
@@ -259,6 +307,11 @@ class ObjectList:
             logging.error(error)
 
     def list(self, details: bool = False):
+        """Tabular representation of object list.
+
+        Args:
+            details (bool, optional): Extended table with additional columns. Defaults to False.
+        """
         if not details:
             table = Table(
                 *self.SUBTYPE.OVERVIEW_FIELDS.keys(),

@@ -15,6 +15,8 @@ from spl.connection_adapter import ConnectionAdapter
 class SamplesManager:
     """[summary]
 
+    # TODO: Add description
+
     [extended_summary]
     """
 
@@ -25,7 +27,53 @@ class SamplesManager:
         self._parent = parent
         self.src = parent._src
         self._work_dir = path
-        # pass
+
+    def __str__(self):
+        print(list(self._settings.SAMPLES.to_dict().keys()))
+        return ""
+
+    def _query_to_file(self, sample, sample_props, connection, path):
+        """Create search job, wait for results and store them to file.
+
+        Args:
+            sample (str): Name of the sample data set.
+            sample_props (dict): Sample properties from settings.
+            connection (src): Connection to use to get samples if not set in src.
+            path (Path): Place to store resulting sample data set as file.
+        """
+        self._log.info(f"About to download sample '{sample}':")
+        self._log.debug(sample_props)
+        search_args = {
+            "earliest_time": sample_props["earliest"],
+            "latest_time": sample_props["latest"],
+            "search_mode": "normal",
+        }
+
+        job = connection.spl.jobs.create("search " + sample_props["query"], **search_args)
+        self._log.debug(f"Created search job on '{connection._name}'.")
+        sleep(2)
+        while True:
+            job.refresh()
+            self._log.info(
+                f"Splunk data fetch status: '{float(job['doneProgress']) * 100}'"
+                + " percent - '{int(job['scanCount'])}' scanned - '{int(job['eventCount'])}'"
+                + " matched - '{int(job['resultCount'])}' results"
+            )
+            if job["isDone"] == "1":
+                break
+            sleep(2)
+        kwargs_options = {"count": 0}
+        self._log.info("Finished job. Reading results now.")
+        results = list(spl_results.ResultsReader(job.results(**kwargs_options)))
+        self._log.info(f"Fetched {len(results)} events")
+        if len(results) <= 1:
+            self._log.warning("Did not write any data to remote service as query result was empty.")
+        else:
+            self._log.info(f"Writing results to {path+'/'+sample}.csv")
+            with open(path + f"/{sample}.csv", "w", encoding="utf-8") as outfile:
+                csv_writer = csv.writer(outfile)
+                csv_writer.writerow(results[0].keys())
+                csv_writer.writerows([result.values() for result in results])
 
     def download(self, name: Optional[str] = None, connection: str = None):
         """Download sample data endpoint triggering query & store threads.
@@ -56,7 +104,7 @@ class SamplesManager:
             ]:
                 samples = list(self._settings.SAMPLES.keys())
             else:
-                print(name)
+                self._log.info(name)
                 raise ValueError("FATAAAAAL!!!")
         else:
             samples = [
@@ -117,51 +165,5 @@ class SamplesManager:
                     ),
                 )
             except Exception:
-                print("Error: unable to start thread")
-
-    def _query_to_file(self, sample, sample_props, connection, path):
-        """Create search job, wait for results and store them to file.
-
-        Args:
-            sample (str): Name of the sample data set.
-            sample_props (dict): Sample properties from settings.
-            connection (src): Connection to use to get samples if not set in src.
-            path (Path): Place to store resulting sample data set as file.
-        """
-        self._log.info(f"About to download sample '{sample}':")
-        self._log.debug(sample_props)
-        search_args = {
-            "earliest_time": sample_props["earliest"],
-            "latest_time": sample_props["latest"],
-            "search_mode": "normal",
-        }
-
-        job = connection.spl.jobs.create("search " + sample_props["query"], **search_args)
-        self._log.debug(f"Created search job on '{connection._name}'.")
-        sleep(2)
-        while True:
-            job.refresh()
-            self._log.info(
-                f"Splunk data fetch status: '{float(job['doneProgress']) * 100}'"
-                + " percent - '{int(job['scanCount'])}' scanned - '{int(job['eventCount'])}'"
-                + " matched - '{int(job['resultCount'])}' results"
-            )
-            if job["isDone"] == "1":
-                break
-            sleep(2)
-        kwargs_options = {"count": 0}
-        self._log.info("Finished job. Reading results now.")
-        results = list(spl_results.ResultsReader(job.results(**kwargs_options)))
-        self._log.info(f"Fetched {len(results)} events")
-        if len(results) <= 1:
-            self._log.warning("Did not write any data to remote service as query result was empty.")
-        else:
-            self._log.info(f"Writing results to {path+'/'+sample}.csv")
-            with open(path + f"/{sample}.csv", "w", encoding="utf-8") as outfile:
-                csv_writer = csv.writer(outfile)
-                csv_writer.writerow(results[0].keys())
-                csv_writer.writerows([result.values() for result in results])
-
-    def __str__(self):
-        print(list(self._settings.SAMPLES.to_dict().keys()))
-        return ""
+                self._log.error("Unable to start thread.")
+                return

@@ -9,7 +9,7 @@ from typing import Union
 import fire
 from cerberus import Validator  # Receive and work with what we expect
 from dynaconf import Dynaconf
-from rich import inspect, print  # pylint: disable=W0622
+from rich import print  # pylint: disable=W0622
 from rich.logging import RichHandler
 
 from spl.apps_manager import AppsManager
@@ -80,6 +80,19 @@ class SplManager:
                 self, interactive=self._interactive, src=self._src, dest=self._dest
             )
 
+    @property
+    def connections(self):
+        """Available connections from settings.
+
+        Returns:
+            str: Concatenated list of connection names, that can be used.
+        """
+        return (
+            "Possible connections are: '"
+            + str("', '".join(self._settings.CONNECTIONS.keys()))
+            + "'."
+        )
+
     def manager(self, conn: str = "localhost") -> ConnectionAdapter:
         """Splunk connection management.
 
@@ -129,20 +142,6 @@ class SplManager:
 
         """
         return AppsManager(self, path=path, name=name)
-
-    @property
-    def connections(self):
-        """Available connections from settings.
-
-        Returns:
-            str: Concatenated list of connection names, that can be used.
-        """
-        return (
-            "Possible connections are: '"
-            + str("', '".join(self._settings.CONNECTIONS.keys()))
-            + "'."
-        )
-
 
 # CLI Entrypoint:
 if __name__ == "__main__":

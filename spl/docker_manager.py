@@ -3,10 +3,11 @@ import os
 import tarfile
 from pathlib import Path
 from time import sleep
-from typing import Optional, Union
+from typing import List, Optional, Union
 
 import docker
 from InquirerPy import inquirer
+from InquirerPy.exceptions import InvalidArgument
 from rich import print  # pylint: disable=W0622
 from rich.progress import track
 
@@ -19,6 +20,7 @@ class DockerManager:
 
         Args:
             parent (object, optional): Splunk manager instance. Defaults to None.
+            start: Start or restart splunk container.
         """
         self._parent = parent
         self._interactive = parent._interactive
@@ -33,27 +35,6 @@ class DockerManager:
         if self._container is not None and "State" in self._container:
             print(f" - Container:      '{self._container['State']}'")
         return "Docker helper for Splunk development purposes."
-
-    def _check_running(self) -> bool:
-        """Ensure container instance is running or try to start.
-
-        Returns:
-            bool: Container instance status is "Up*".
-        """
-        self._container = self._get_or_create_container()
-        if self._container:
-            while "State" not in self._container:
-                sleep(1)
-            if "Up" in self._container["Status"]:
-                return True
-            if (
-                inquirer.confirm(
-                    message="Do you want to start the container?", default=True
-                ).execute()
-                or not self._interactive
-            ):
-                self.start()
-        return False
 
     @property
     def image(self) -> Optional[dict]:
@@ -87,8 +68,61 @@ class DockerManager:
             else None
         )
 
+    @property
+    def _splunk_var_volume(self) -> dict:
+        for volume in self._docker.volumes()["Volumes"]:
+            if "splunk" in volume["Name"] and "var" in volume["Name"]:
+                self._log.info("Found an existing volume for 'splunk_var'.")
+                return volume
+        self._log.info("Creating new volume for 'splunk_var'.")
+        return self._docker.create_volume(
+            name="splunk_var",
+            driver="local",
+            labels={
+                "io.nextpart.project": "nextpart_splunking",
+                "io.nextpart.volume": "splunk_var",
+            },
+        )
+
+    @property
+    def _splunk_etc_volume(self) -> dict:
+        for volume in self._docker.volumes()["Volumes"]:
+            if "splunk" in volume["Name"] and "etc" in volume["Name"]:
+                self._log.info("Found an existing volume for 'splunk_etc'.")
+                return volume
+        self._log.info("Creating new volume for 'splunk_etc'.")
+        return self._docker.create_volume(
+            name="splunk_etc",
+            driver="local",
+            labels={
+                "io.nextpart.project": "nextpart_splunking",
+                "io.nextpart.volume": "splunk_etc",
+            },
+        )
+
+    def _check_running(self) -> bool:
+        """Ensure container instance is running or try to start.
+
+        Returns:
+            bool: Container instance status is "Up*".
+        """
+        self._container = self._get_or_create_container()
+        if self._container:
+            while "State" not in self._container:
+                sleep(1)
+            if "Up" in self._container["Status"]:
+                return True
+            if (
+                inquirer.confirm(
+                    message="Do you want to start the container?", default=True
+                ).execute()
+                or not self._interactive
+            ):
+                self.start()
+        return False
+
     def _get_or_create_container(self, interactive=None) -> dict:
-        """Splunk docker container creation if not existing.
+        """Create Splunk docker container if not exists.
 
         A created or existing docker container for splunk image.
 
@@ -139,7 +173,33 @@ class DockerManager:
             user="root",
             detach=True,
         )
-        sleep(5)
+    def _get_custom_apps_installed_in_container(self) -> List[str]:
+        """Connect to Splunk Container and get all installed custom apps.
+
+        Returns:
+            List[str]: A list of all installed custom apps that were found.
+        """
+        # Get all installed apps in $SPLUNKHOME/etc/apps
+        container_apps = self._docker.exec_start(
+            self._docker.exec_create(
+                container="splunk",
+                workdir="/opt/splunk/etc/apps",
+                cmd=(
+                    "bash -c '"
+                    + "find . -name app.conf"
+                    + r" -exec dirname {} \; | xargs dirname ;"
+                    + "'"
+                ),
+            )["Id"]
+        ).decode("utf-8")
+        # Get all custom apps
+        container_apps = [
+            app.replace("./", "")
+            for app in container_apps.split("\n")
+            if "/" not in app.replace("./", "")
+            and app.replace("./", "") not in self._settings.APPS.exclude
+        ]
+        return container_apps
 
     def _splunkbase_installs(self) -> str:
         """Build SPLUNK_APPS_URL env var for container.
@@ -167,57 +227,32 @@ class DockerManager:
         """Start or restart splunk container.
 
         Returns:
-            dict: docker client continer (re)start response dict.
+            dict: docker client container (re)start response dict.
         """
         if self._container["Status"] == "Created":
             self._container = self._docker.start(self._container["Id"])
             return self._container
-        if "Up" in self._container["Status"]:
+        elif "Exited" in self._container["Status"]:
+            self._log.info("Restarting stopped Splunk container.")
+            self._container = self._docker.restart(self._container["Id"])
+        elif "Up" in self._container["Status"]:
             self._log.warning("Container already exists and is running.")
         else:
             self._log.warning("Strange... restarting...")
             self._container = self._docker.restart(self._container["Id"])
             return self._container
 
-    @property
-    def _splunk_var_volume(self) -> dict:
-        for volume in self._docker.volumes()["Volumes"]:
-            if "splunk" in volume["Name"] and "var" in volume["Name"]:
-                self._log.info("Found an existing volume for 'splunk_var'.")
-                return volume
-        self._log.info("Creating new volume for 'splunk_var'.")
-        return self._docker.create_volume(
-            name="splunk_var",
-            driver="local",
-            labels={
-                "io.nextpart.project": "nextpart_splunking",
-                "io.nextpart.volume": "splunk_var",
-            },
-        )
-
-    @property
-    def _splunk_etc_volume(self) -> dict:
-        for volume in self._docker.volumes()["Volumes"]:
-            if "splunk" in volume["Name"] and "etc" in volume["Name"]:
-                self._log.info("Found an existing volume for 'splunk_etc'.")
-                return volume
-        self._log.info("Creating new volume for 'splunk_etc'.")
-        return self._docker.create_volume(
-            name="splunk_etc",
-            driver="local",
-            labels={
-                "io.nextpart.project": "nextpart_splunking",
-                "io.nextpart.volume": "splunk_etc",
-            },
-        )
-
     def stop(self):
-        """Stop the container instance.
+        """Stop the container instance."""
+        if "Up" in self._container["Status"]:
+            self._log.info(f"Stopping container: {self._container['Id']}")
+            self._docker.stop(self._container["Id"])
+        else:
+            self._log.warning("No Splunk Container to stop!")
 
-        Raises:
-            NotImplementedError: [description]
-        """
-        raise NotImplementedError()
+    def list(self):
+        """Get a list of all installed custom apps in the container."""
+        return self._get_custom_apps_installed_in_container()
 
     def upload(self, path: Union[Path, str] = Path.cwd(), app: str = None):
         """Upload local splunk apps to container instance.
@@ -229,15 +264,24 @@ class DockerManager:
         if not self._check_running():
             self._log.error("Splunk container is not running. Will skip step.")
             return
+        # Check if path exists
+        if isinstance(path, str) and not Path(path).exists():
+            self._log.error("The specified path does not exist. Please provide a valid path.")
+            return
         apps = self._parent.apps(path=path, name=app)._paths
-        if self._interactive:
-            apps_selected = inquirer.checkbox(
-                message="What apps do you want to upload to your instance?",
-                choices=[app.name for app in apps],
-                default=[app.name for app in apps],
-            ).execute()
-            apps = [app for app in apps if app.name in apps_selected]
-        self._log.info("Uploading apps '" + "', '".join([app.name for app in apps]) + "'.")
+        apps.sort()
+        try:
+            if self._interactive:
+                apps_selected = inquirer.checkbox(
+                    message="What apps do you want to upload to your instance?",
+                    choices=[app.name for app in apps],
+                    default=[app.name for app in apps],
+                ).execute()
+                apps = [app for app in apps if app.name in apps_selected]
+            self._log.info("Uploading apps '" + "', '".join([app.name for app in apps]) + "'.")
+        except InvalidArgument:
+            self._log.error("Current path does not contain any Splunk Apps. Hint: Try --path")
+            return
         Path.cwd()
         for tmp_app in track(apps):
             with tarfile.open(str(tmp_app) + ".tar", mode="w") as tar:
@@ -259,49 +303,6 @@ class DockerManager:
             os.remove(Path(str(tmp_app) + ".tar"))
             self.fix_app_permissions(app_name=tmp_app.name)
 
-    def fix_app_permissions(self, app_name: Optional[str] = None):
-        """Fix container instance splunk application permissions.
-
-        Args:
-            app_name (Optional[str]): Name of the app. Defaults to None.
-
-        Raises:
-            ValueError: No name provided for app.
-        """
-        if app_name is None:
-            raise ValueError
-        execution = self._docker.exec_create(
-            container="splunk",
-            workdir="/opt/splunk/etc/apps",
-            cmd=(
-                "bash -c '"
-                + f"chown -R splunk. {app_name} ;"
-                + f"chmod 755 {app_name} ;"
-                + f"find {app_name} -maxdepth 1 -name 'azure-pipelines.yml'"
-                + r" -exec rm {} \;  >/dev/null 2>&1 ;"
-                + f"find {app_name} -maxdepth 1 -name '*.rst'"
-                + r" -exec rm {} \;  >/dev/null 2>&1 ;"
-                + f"find {app_name} -maxdepth 1 -name '.git*'"
-                + r" -exec rm {} \;  >/dev/null 2>&1 ;"
-                + f"find {app_name} -maxdepth 1 -name '.pre-commit-config.yaml'"
-                + r" -exec rm {} \;  >/dev/null 2>&1 ;"
-                + f"find {app_name} -type d"
-                + r" -exec chmod -R 700 {} \;  >/dev/null 2>&1 ;"
-                + f"find {app_name} -type f"
-                + r" -exec chmod -R 644 {} \;  >/dev/null 2>&1 ;"
-                + f"find {app_name}/local {app_name}/default {app_name}/static -type f"
-                + r" -exec chmod 600 {} \; >/dev/null 2>&1 ;"
-                + f"find {app_name}/bin -type f"
-                + r" -exec chmod 655 {} \;  >/dev/null 2>&1 ;"
-                + f"find {app_name}/static -type d"
-                + r" -exec chmod 710 {} \;  >/dev/null 2>&1 ;"
-                + f"find {app_name}/static -name app.manifest"
-                + r" -exec chmod 600 {} \;  >/dev/null 2>&1 ;"
-                + "'"
-            ),
-        )
-        self._log.debug(self._docker.exec_start(execution["Id"]).decode("utf-8"))
-
     def download(self, path: Union[Path, str] = Path.cwd(), app: str = None):
         """Download splunk container instance application to local filesystem.
 
@@ -312,25 +313,19 @@ class DockerManager:
         if not self._check_running():
             self._log.error("Splunk container is not running. Will skip step.")
             return
-        local_apps = self._parent.Apps(path=path)._paths
-        container_apps = self._docker.exec_start(
-            self._docker.exec_create(
-                container="splunk",
-                workdir="/opt/splunk/etc/apps",
-                cmd=(
-                    "bash -c '"
-                    + "find . -name app.conf"
-                    + r" -exec dirname {} \; | xargs dirname ;"
-                    + "'"
-                ),
-            )["Id"]
-        ).decode("utf-8")
-        container_apps = [
-            app.replace("./", "")
-            for app in container_apps.split("\n")
-            if "/" not in app.replace("./", "")
-            and app.replace("./", "") not in self._settings.APPS.exclude
-        ]
+        # Check if path exists
+        if isinstance(path, str) and not Path(path).exists():
+            self._log.warn("The specified path for storing Splunk Apps does not exist.")
+            if inquirer.confirm(
+                message=f"Do you want to create the folder: {path}?", default=True
+            ).execute():
+                self._log.info(f"Creating dir(s): {path}")
+                os.makedirs(path)
+            else:
+                self._log.error("You have to specify an existing folder.")
+                return
+        local_apps = self._parent.apps(path=path)._paths
+        container_apps = self._get_custom_apps_installed_in_container()
         selected_apps = []
         if app:
             app = app.replace("*", "")
@@ -356,6 +351,8 @@ class DockerManager:
         self._log.info("Downloading apps '" + "', '".join(selected_apps) + "'.")
         Path.cwd()
         for tmp_app in track(selected_apps):
+            if isinstance(path, Path):
+                path = "."
             bits, stat = self._docker.get_archive(
                 container="splunk", path=f"/opt/splunk/etc/apps/{tmp_app}"
             )
@@ -369,3 +366,54 @@ class DockerManager:
             self._log.debug("Extracted downloaded artifact for {tmp_app}.")
             os.remove(Path(str(path + "/" + tmp_app) + ".tar"))
             self._log.debug("Removed downloaded archive {tmp_app}.tar after extraction.")
+
+    def fix_app_permissions(self, app_name: Optional[str] = None):
+        """Fix splunk application permissions in container instance.
+
+        Args:
+            app_name (Optional[str]): Name of the app. Defaults to None.
+        """
+        container_apps = self._get_custom_apps_installed_in_container()
+        selected_apps = []
+        if self._interactive:
+            selected_apps = inquirer.checkbox(
+                message="For which apps should the permissions be fixed on your instance?",
+                choices=container_apps,
+                default=container_apps,
+            ).execute()
+        else:
+            for app in container_apps:
+                selected_apps.append(app)
+        for app_name in track(selected_apps):
+            execution = self._docker.exec_create(
+                container="splunk",
+                workdir="/opt/splunk/etc/apps",
+                cmd=(
+                    "bash -c '"
+                    + f"chown -R splunk. {app_name} ;"
+                    + f"chmod 755 {app_name} ;"
+                    + f"find {app_name} -maxdepth 1 -name 'azure-pipelines.yml'"
+                    + r" -exec rm {} \;  >/dev/null 2>&1 ;"
+                    + f"find {app_name} -maxdepth 1 -name '*.rst'"
+                    + r" -exec rm {} \;  >/dev/null 2>&1 ;"
+                    + f"find {app_name} -maxdepth 1 -name '.git*'"
+                    + r" -exec rm {} \;  >/dev/null 2>&1 ;"
+                    + f"find {app_name} -maxdepth 1 -name '.pre-commit-config.yaml'"
+                    + r" -exec rm {} \;  >/dev/null 2>&1 ;"
+                    + f"find {app_name} -type d"
+                    + r" -exec chmod -R 700 {} \;  >/dev/null 2>&1 ;"
+                    + f"find {app_name} -type f"
+                    + r" -exec chmod -R 644 {} \;  >/dev/null 2>&1 ;"
+                    + f"find {app_name}/local {app_name}/default {app_name}/static -type f"
+                    + r" -exec chmod 600 {} \; >/dev/null 2>&1 ;"
+                    + f"find {app_name}/bin -type f"
+                    + r" -exec chmod 655 {} \;  >/dev/null 2>&1 ;"
+                    + f"find {app_name}/static -type d"
+                    + r" -exec chmod 710 {} \;  >/dev/null 2>&1 ;"
+                    + f"find {app_name}/static -name app.manifest"
+                    + r" -exec chmod 600 {} \;  >/dev/null 2>&1 ;"
+                    + "'"
+                ),
+            )
+            self._log.debug(self._docker.exec_start(execution["Id"]).decode("utf-8"))
+        self._log.info("Fixed Permissions for Splunk Apps: ['" + "', '".join(selected_apps) + "'].")

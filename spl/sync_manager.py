@@ -31,7 +31,7 @@ class SyncManager:
         delete: bool = False,
         simulate: bool = False,
     ):
-        handler = self._DiffHandler(
+        self._DiffHandler(
             parent=self,
             diff=Roles.diff,
             accessor=self.src.client.roles,
@@ -201,11 +201,11 @@ class SyncManager:
             if "dictionary_item_removed" in self.diff and "create" in self._sync_actions:
                 items = [
                     item
-                    for item, property in [
+                    for item, prop in [
                         self._sanitize_item_path(item)
                         for item in self.diff["dictionary_item_removed"]
                     ]
-                    if property == ""  # Add property in update.
+                    if prop == ""  # Add property in update.
                 ]
                 if not items:
                     return

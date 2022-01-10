@@ -100,6 +100,9 @@ python -m spl -h
 or `poetry run python -m spl -h`. Anyhow it's recommended to set the
 `alias spl="python -m spl` for easier handling.
 
+You have to create a `config\.secrets.yaml` file by using the `config\template.secrets.yaml` file, which contains
+the credentials for the Development Docker-Container and Splunkbase.
+
 ## Using the library
 
 Please note that, when using the library as an SDK you need to pass the

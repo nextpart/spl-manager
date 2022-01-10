@@ -1,8 +1,9 @@
 # -*- coding: utf-8 -*-
 # %%
 from rich import print
-
+from pathlib import Path
 from spl.__main__ import SplManager
+import splunk_appinspect
 
 # %%
 spl = SplManager(src="nxtp-onprem", dest="localhost", interactive=False)
@@ -153,3 +154,46 @@ print(
 
 
 # %%
+apps =spl.apps(path=Path("../../apps"),name="*")
+apps
+
+# %%
+my_apps = apps._apps
+# %%
+my_apps[0].__dict__
+
+
+# %%
+app = splunk_appinspect.App(location=Path("../../apps/Defender_TA_nxtp"),
+python_analyzer_enable=False, 
+trusted_libs_manager=False)
+
+# %%
+my_apps.sort(key = lambda x : x.package_id)
+[app.package_id for app in my_apps]
+
+
+
+
+
+
+# %%
+from rich import print
+from pathlib import Path
+from spl.__main__ import SplManager
+import splunk_appinspect
+
+# %%
+spl = SplManager(src="rb-onprem", dest="localhost", interactive=False)
+
+# %%
+client = spl._src.client
+
+
+# %%
+[ index.name for index in client.indexes.list() ]
+
+
+# %%
+client.namespace['app'] = "SPLUNK_GLOBAL_INDEXROUTING"
+

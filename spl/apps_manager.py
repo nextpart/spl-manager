@@ -6,7 +6,7 @@ import os
 from pathlib import Path
 from time import sleep
 from typing import Optional, Union
-
+import operator
 import docker
 import requests
 import splunk_appinspect
@@ -31,6 +31,15 @@ class AppsManager:
     _results = {}
 
     def __init__(self, parent: object, path: Union[Path, str] = Path.cwd(), name: str = None):
+        """Local application management module initialization.
+
+        Args:
+            parent (object): Manager with properties to propagate.
+            path (Union[Path, str], optional): Working directory of applications or where to search.
+                Defaults to Path.cwd().
+            name (str, optional): Name or wildcard pattern to search for applications matching.
+                Defaults to None.
+        """
         if isinstance(path, str):
             path = Path(path)
         self._parent = parent
@@ -52,29 +61,30 @@ class AppsManager:
                 }
             )
 
-    @property
-    def _apps(self):
-        apps = []
-        logging.getLogger("splunk_appinspect.app").disabled = True
-        for path in track(self._paths):
-            try:
-                apps.append(
-                    splunk_appinspect.App(
-                        location=path,
-                        python_analyzer_enable=False,
-                        trusted_libs_manager=False,
-                    )
-                )
-            except Exception as exc:
-                self._log.warning(exc)
-        return apps
-
     def __str__(self):
         return (
             str(", ".join([app_path.name for app_path in self._paths]))
             if self._paths
             else "No apps found!"
         )
+
+    @property
+    def _apps(self):
+        apps = []
+        logging.getLogger("splunk_appinspect.app").disabled = True
+        for path in track(self._paths):
+            # try:
+            apps.append(
+                splunk_appinspect.App(
+                    location=path,
+                    python_analyzer_enable=False,
+                    trusted_libs_manager=False,
+                )
+            )
+            # except Exception as exc:
+            #     self._log.warning(exc)
+        apps.sort(key = lambda x : x.package_id)  
+        return apps
 
     def list(self, csv_file: Optional[str] = None):
         """Determine apps from local directory and print table or write to csv.
@@ -215,10 +225,10 @@ class AppsManager:
         else:
             self._log.info(f"Using older packaging result for '{app_path.name}'.")
 
-        # with open(
-        #     str(result_dir) + "/" + str(app_path.name) + "_appinspect.log", "r", encoding="utf-8"
-        # ) as log_file:
-        #     self._log.info(log_file.read())
+        with open(
+            str(result_dir) + "/" + str(app_path.name) + "_appinspect.log", "r", encoding="utf-8"
+        ) as log_file:
+            self._log.info(log_file.read())
 
     def run_cloudvetting(self, app_name: str, dist_path: Path, force=False):
         """Cloud vetting routine via AppInspect API. Can bring different results.
@@ -325,6 +335,9 @@ class AppsManager:
         """
         for image in self._docker.images():
             tags = image["RepoTags"]
+            # Skip tags check if tags is None
+            if tags is None:
+                continue
             if len(tags) > 0 and self._settings.DOCKER.PACKAGE_IMAGE in tags:
                 return image
         self._log.info("Couldn't find splunk packaging docker image locally.")

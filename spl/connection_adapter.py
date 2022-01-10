@@ -26,6 +26,9 @@ class ConnectionAdapter:
         self._interactive = parent._interactive
         self._log = parent._log
         self._settings = parent._settings
+        self.owner = None
+        self.sharing = None
+        self.user = None
         self.client: spl_client.Service = spl_client.connect(
             host=self._settings.CONNECTIONS[name]["host"],
             port=self._settings.CONNECTIONS[name]["port"],
@@ -35,6 +38,13 @@ class ConnectionAdapter:
         self._log.info(
             f"Connection adapter for '{self._name}' ({self.client.authority})"
             + f" as user '{self.client.username}' with namespace: {self.client.namespace}."
+        )
+
+    def __str__(self):
+        self._log.info(f"Connection user {self.client.username}")
+        return (
+            f"Connection adapter for '{self._name}' ({self.client.authority})"
+            + f" as user '{self.client.username}'."
         )
 
     @property
@@ -71,13 +81,6 @@ class ConnectionAdapter:
             client=self.client, accessor=self.client.inputs, interactive=self._interactive
         )
 
-    def __str__(self):
-        self._log.info(f"Connection user {self.client.username}")
-        return (
-            f"Connection adapter for '{self._name}' ({self.client.authority})"
-            + f" as user '{self.client.username}'."
-        )
-
     def test(self):
         return "test"
 
@@ -94,7 +97,10 @@ class ConnectionAdapter:
         sharing: Optional[str] = None,  # "system",
         owner: Optional[str] = None,  # "admin",
     ):
-        """Namespace context for splunk interaction.
+        """Set the namespace context for splunk interaction.
+
+        # TODO: Add a better description of what this method does.
+        # TODO: Add description to Args & Raises
 
         Args:
             context (bool): Whether or not to ask for context input.
@@ -104,7 +110,6 @@ class ConnectionAdapter:
 
         Raises:
             ValueError: [description]
-
         """
         if context:
             self._log.info(f"Determining namespace/context for connection '{self._name}'")
