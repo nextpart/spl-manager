@@ -500,47 +500,65 @@ class ObjectList:
         console.print(table)
 
 
-class User(Object):
+class App(Object):
 
-    OVERVIEW_FIELDS = {
-        "User": None,
-        "Type": "type",
-        "Last Login": "last_successful_login",
-    }
+    OVERVIEW_FIELDS = {"ID": None, "Title": "label", "Version": "version"}
     DETAIL_FIELDS = {
         **OVERVIEW_FIELDS,
         **{
-            "Email": "email",
-            "Name": "realname",
-            "Roles": "roles",
-            "Capabilities": "capabilities",
-            "Default App": "defaultApp",
+            "Author": "author",
+            "Disabled": "disabled",
+            "Visible": "visible",
+            "Splunkbase": "details",
+            "Nav": "show_in_nav",
         },
     }
-    SYNC_EXCLUDE = ["capabilities", "password", "last_successful_login", "defaultAppIsUserOverride", "defaultAppSourceRole", "type"]
-    __name__ = "User"
+    SYNC_EXCLUDE = []
+    __name__ = "App"
 
 
-class Users(ObjectList):
+class Apps(ObjectList):
 
-    SUBTYPE = User
+    SUBTYPE = App
 
     @staticmethod
     def diff(src_client, dest_client) -> DeepDiff:
         return ObjectList._diff(
             src_client=src_client,
-            src_client_accessor=src_client.users.list(),
+            src_client_accessor=src_client.apps.list(),
             dest_client=dest_client,
-            dest_client_accessor=dest_client.users.list(),
+            dest_client_accessor=dest_client.apps.list(),
         )
 
-    def _migrate_capabilities(self, reference_obj, prop, simulate: bool = False):
-        prop = prop.replace("capabilities.", "")
-        src_capabilities = reference_obj.capabilities
-        dest_capabilities = self._accessor[reference_obj.name].capabilities
-        missing = [
-            capability for capability in src_capabilities if capability not in dest_capabilities
-        ]
+
+class EventType(Object):
+
+    OVERVIEW_FIELDS = {
+        "Name": None,
+        "App": "eai:appName",
+        # "Search": "search",
+        "Tags": "tags",
+    }
+    DETAIL_FIELDS = {
+        **OVERVIEW_FIELDS,
+        **{"Description": "description", "Disabled": "disabled", "Priority": "priority"},
+    }
+    SYNC_EXCLUDE = []
+    __name__ = "EventType"
+
+
+class EventTypes(ObjectList):
+
+    SUBTYPE = EventType
+
+    @staticmethod
+    def diff(src_client, dest_client) -> DeepDiff:
+        return ObjectList._diff(
+            src_client=src_client,
+            src_client_accessor=src_client.event_types.list(),
+            dest_client=dest_client,
+            dest_client_accessor=dest_client.event_types.list(),
+        )
 
 
 class Index(Object):
@@ -577,34 +595,30 @@ class Indexes(ObjectList):
         )
 
 
-class App(Object):
+class Input(Object):
 
-    OVERVIEW_FIELDS = {"ID": None, "Title": "label", "Version": "version"}
+    OVERVIEW_FIELDS = {
+        "Name": None,
+    }
     DETAIL_FIELDS = {
         **OVERVIEW_FIELDS,
-        **{
-            "Author": "author",
-            "Disabled": "disabled",
-            "Visible": "visible",
-            "Splunkbase": "details",
-            "Nav": "show_in_nav",
-        },
+        **{},
     }
     SYNC_EXCLUDE = []
-    __name__ = "App"
+    __name__ = "Input"
 
 
-class Apps(ObjectList):
+class Inputs(ObjectList):
 
-    SUBTYPE = App
+    SUBTYPE = Input
 
     @staticmethod
     def diff(src_client, dest_client) -> DeepDiff:
         return ObjectList._diff(
             src_client=src_client,
-            src_client_accessor=src_client.apps.list(),
+            src_client_accessor=src_client.inputs.list(),
             dest_client=dest_client,
-            dest_client_accessor=dest_client.apps.list(),
+            dest_client_accessor=dest_client.inputs.list(),
         )
 
 
@@ -649,36 +663,6 @@ class Roles(ObjectList):
         )
 
 
-class EventType(Object):
-
-    OVERVIEW_FIELDS = {
-        "Name": None,
-        "App": "eai:appName",
-        # "Search": "search",
-        "Tags": "tags",
-    }
-    DETAIL_FIELDS = {
-        **OVERVIEW_FIELDS,
-        **{"Description": "description", "Disabled": "disabled", "Priority": "priority"},
-    }
-    SYNC_EXCLUDE = []
-    __name__ = "EventType"
-
-
-class EventTypes(ObjectList):
-
-    SUBTYPE = EventType
-
-    @staticmethod
-    def diff(src_client, dest_client) -> DeepDiff:
-        return ObjectList._diff(
-            src_client=src_client,
-            src_client_accessor=src_client.event_types.list(),
-            dest_client=dest_client,
-            dest_client_accessor=dest_client.event_types.list(),
-        )
-
-
 class SavedSearch(Object):
 
     OVERVIEW_FIELDS = {
@@ -693,7 +677,9 @@ class SavedSearch(Object):
             "Scheduled": "is_scheduled",
         },
     }
-    SYNC_EXCLUDE = []
+    SYNC_EXCLUDE = [
+        "embed.enabled"
+    ]
     __name__ = "SavedSearch"
 
 
@@ -711,28 +697,44 @@ class SavedSearches(ObjectList):
         )
 
 
-class Input(Object):
+class User(Object):
 
     OVERVIEW_FIELDS = {
-        "Name": None,
+        "User": None,
+        "Type": "type",
+        "Last Login": "last_successful_login",
     }
     DETAIL_FIELDS = {
         **OVERVIEW_FIELDS,
-        **{},
+        **{
+            "Email": "email",
+            "Name": "realname",
+            "Roles": "roles",
+            "Capabilities": "capabilities",
+            "Default App": "defaultApp",
+        },
     }
-    SYNC_EXCLUDE = []
-    __name__ = "Input"
+    SYNC_EXCLUDE = ["capabilities", "password", "last_successful_login", "defaultAppIsUserOverride", "defaultAppSourceRole", "type"]
+    __name__ = "User"
 
 
-class Inputs(ObjectList):
+class Users(ObjectList):
 
-    SUBTYPE = Input
+    SUBTYPE = User
 
     @staticmethod
     def diff(src_client, dest_client) -> DeepDiff:
         return ObjectList._diff(
             src_client=src_client,
-            src_client_accessor=src_client.inputs.list(),
+            src_client_accessor=src_client.users.list(),
             dest_client=dest_client,
-            dest_client_accessor=dest_client.inputs.list(),
+            dest_client_accessor=dest_client.users.list(),
         )
+
+    def _migrate_capabilities(self, reference_obj, prop, simulate: bool = False):
+        prop = prop.replace("capabilities.", "")
+        src_capabilities = reference_obj.capabilities
+        dest_capabilities = self._accessor[reference_obj.name].capabilities
+        missing = [
+            capability for capability in src_capabilities if capability not in dest_capabilities
+        ]
