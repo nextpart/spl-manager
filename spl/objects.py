@@ -195,7 +195,7 @@ class ObjectList:
                         f"The {self.__name__} {reference_obj.name} has an unknown capability "
                         + f"('{capability}') assigned. We'll skip this assignment."
                     )
-        
+
         # Check if required roles exist on target system
         if (
             "roles" in reference_obj.fields["required"]
@@ -541,8 +541,6 @@ class Users(ObjectList):
         missing = [
             capability for capability in src_capabilities if capability not in dest_capabilities
         ]
-        # print(prop)
-        # print(missing)
 
 
 class Index(Object):
@@ -626,7 +624,14 @@ class Role(Object):
             "Search earliest": "srchTimeEarliest",
         },
     }
-    SYNC_EXCLUDE = ["imported_capabilities", "imported_srchIndexesAllowed", "imported_srchIndexesDefault"]
+    SYNC_EXCLUDE = [
+        "imported_capabilities",
+        "imported_srchIndexesAllowed",
+        "imported_srchIndexesDefault",
+        "imported_rtSrchJobsQuota",
+        "imported_srchDiskQuota",
+        "imported_srchJobsQuota"
+    ]
     __name__ = "Role"
 
 
