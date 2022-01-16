@@ -173,6 +173,7 @@ class DockerManager:
             user="root",
             detach=True,
         )
+
     def _get_custom_apps_installed_in_container(self) -> List[str]:
         """Connect to Splunk Container and get all installed custom apps.
 
@@ -229,18 +230,30 @@ class DockerManager:
         Returns:
             dict: docker client container (re)start response dict.
         """
-        if self._container["Status"] == "Created":
-            self._container = self._docker.start(self._container["Id"])
-            return self._container
-        elif "Exited" in self._container["Status"]:
-            self._log.info("Restarting stopped Splunk container.")
-            self._container = self._docker.restart(self._container["Id"])
-        elif "Up" in self._container["Status"]:
-            self._log.warning("Container already exists and is running.")
-        else:
-            self._log.warning("Strange... restarting...")
-            self._container = self._docker.restart(self._container["Id"])
-            return self._container
+        seconds_to_wait = 1
+        while (container_starting := True):
+            self._container = self._get_or_create_container() # Update container instance
+            try:
+                if self._container["Status"] == "Created":
+                    self._container = self._docker.start(self._container["Id"])
+                    self._log.info("Container starting...")
+                    return self._container
+                elif "Exited" in self._container["Status"]:
+                    self._log.info("Restarting stopped Splunk container.")
+                    self._container = self._docker.restart(self._container["Id"])
+                elif "Up" in self._container["Status"]:
+                    self._log.info("Container already exists and is running.")
+                    return self._container
+                else:
+                    self._log.warning("Strange... restarting...")
+                    self._container = self._docker.restart(self._container["Id"])
+                    return self._container
+            except KeyError:
+                self._log.info("Waiting for Container to start...")
+                seconds_to_wait *= 2 # Wait exponentially
+                sleep(seconds_to_wait)
+                continue
+            container_starting = False
 
     def stop(self):
         """Stop the container instance."""
