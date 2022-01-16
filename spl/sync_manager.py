@@ -185,7 +185,6 @@ class SyncManager:
         ):
             self.simulate = simulate
             self.diff = self._diff_gen(self.src.client, self.dest.client)
-            print(self.diff)
             self._log.info(self.diff)
             if create:
                 self._create()

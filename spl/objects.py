@@ -181,6 +181,7 @@ class ObjectList:
             and field not in self.SUBTYPE.SYNC_EXCLUDE
         }
 
+        # Check if required capabilities exist on target system
         if (
             "capabilities" in reference_obj.fields["required"]
             or "capabilities" in reference_obj.fields["optional"]
@@ -195,7 +196,22 @@ class ObjectList:
                         + f"('{capability}') assigned. We'll skip this assignment."
                     )
         
-        print(args)       
+        # Check if required roles exist on target system
+        if (
+            "roles" in reference_obj.fields["required"]
+            or "roles" in reference_obj.fields["optional"]
+        ):
+            args["roles"] = []
+            for role in reference_obj.roles:
+                if role in self.client.roles:
+                    args["roles"].append(role)
+                else:
+                    logging.warning(
+                        f"The {self.__name__} {reference_obj.name} has an unknown role "
+                        + f"('{role}') assigned. We'll skip this assignment."
+                    )
+
+        print(f"{args}")
 
         # if "access" in reference_obj.__dict__.keys():
         #     print(reference_obj.access)

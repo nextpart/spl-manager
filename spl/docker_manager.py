@@ -243,7 +243,7 @@ class DockerManager:
                     self._container = self._docker.restart(self._container["Id"])
                 elif "Up" in self._container["Status"]:
                     self._log.info("Container already exists and is running.")
-                    return self._container
+                    return None
                 else:
                     self._log.warning("Strange... restarting...")
                     self._container = self._docker.restart(self._container["Id"])
