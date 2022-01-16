@@ -7,7 +7,7 @@ import splunklib.client as spl_client
 from deepdiff import DeepDiff
 from InquirerPy import inquirer
 
-# from rich import inspect, print  # pylint: disable=W0622
+from rich import print  # pylint: disable=W0622
 from rich.console import Console
 from rich.progress import track
 from rich.table import Table
@@ -49,6 +49,7 @@ class ObjectList:
         self._interactive = interactive
         self._accessor = accessor
         self.items = self.generate()
+        self.__name__ = type(self._accessor).__name__
 
     def __str__(self):
         return str([str(item) for item in self.items])
@@ -99,21 +100,21 @@ class ObjectList:
                     "content": item.content
                 }
                 for item in src_client_accessor
-                if not ("_state" in item.__dict__ and "access" in item.__dict__["_state"])
-                or (
-                    (
-                        src_client.namespace["app"] is None
-                        or src_client.namespace["app"] == item.access.app
-                    )
-                    and (
-                        src_client.namespace["sharing"] is None
-                        or src_client.namespace["sharing"] == item.access.sharing
-                    )
-                    and (
-                        src_client.namespace["owner"] is None
-                        or src_client.namespace["owner"] == item.access.owner
-                    )
-                )
+                # if not ("_state" in item.__dict__ and "access" in item.__dict__["_state"])
+                # or (
+                #     (
+                #         src_client.namespace["app"] not in ["-", None]
+                #         or src_client.namespace["app"] == item.access.app
+                #     )
+                #     and (
+                #         src_client.namespace["sharing"] not in ["-", None]
+                #         or src_client.namespace["sharing"] == item.access.sharing
+                #     )
+                #     and (
+                #         src_client.namespace["owner"] not in ["-", None]
+                #         or src_client.namespace["owner"] == item.access.owner
+                #     )
+                # )
             },
             {
                 str(item.name): {
@@ -121,21 +122,21 @@ class ObjectList:
                     "content": item.content
                 }
                 for item in dest_client_accessor
-                if not ("_state" in item.__dict__ and "access" in item.__dict__["_state"])
-                or (
-                    (
-                        dest_client.namespace["app"] is None
-                        or dest_client.namespace["app"] == item.access.app
-                    )
-                    and (
-                        dest_client.namespace["sharing"] is None
-                        or dest_client.namespace["sharing"] == item.access.sharing
-                    )
-                    and (
-                        dest_client.namespace["owner"] is None
-                        or dest_client.namespace["owner"] == item.access.owner
-                    )
-                )
+                # if not ("_state" in item.__dict__ and "access" in item.__dict__["_state"])
+                # or (
+                #     (
+                #         dest_client.namespace["app"] not in ["-", None]
+                #         or dest_client.namespace["app"] == item.access.app
+                #     )
+                #     and (
+                #         dest_client.namespace["sharing"] not in ["-", None]
+                #         or dest_client.namespace["sharing"] == item.access.sharing
+                #     )
+                #     and (
+                #         dest_client.namespace["owner"] not in ["-", None]
+                #         or dest_client.namespace["owner"] == item.access.owner
+                #     )
+                # )
             },
             ignore_order=True,
         )
@@ -170,9 +171,10 @@ class ObjectList:
     def _create(self, reference_obj, simulate: bool = False):
         if not self.check_create(reference_obj=reference_obj, simulate=simulate):
             return
+        # print(reference_obj.fields["required"] + reference_obj.fields["optional"])
         args = {
             field: reference_obj.content[field]
-            for field in reference_obj.fields["optional"]
+            for field in reference_obj.__dict__["_state"]["content"].keys() # reference_obj.fields["required"] + reference_obj.fields["optional"]
             if field in reference_obj.content
             and reference_obj.content[field] is not None
             and reference_obj.content[field] != "-1"
@@ -190,8 +192,14 @@ class ObjectList:
                 else:
                     logging.warning(
                         f"The {self.__name__} {reference_obj.name} has an unknown capability "
-                        + " ('{capability}') assigned. We'll skip this assignment."
+                        + f"('{capability}') assigned. We'll skip this assignment."
                     )
+        
+        print(args)       
+
+        # if "access" in reference_obj.__dict__.keys():
+        #     print(reference_obj.access)
+        
         try:
             if isinstance(reference_obj, spl_client.User):
                 self._accessor.create(
@@ -202,68 +210,138 @@ class ObjectList:
         except spl_context.HTTPError as error:
             logging.error(error)
 
-    def check_update(self, reference_obj, prop, simulate: bool = False):
-        try:
-            old_value = self._accessor[reference_obj.name]
-            for item in prop.split("."):
-                old_value = old_value[item]
-        except KeyError:
-            old_value = None
-        new_value = reference_obj
-        try:
-            for item in prop.split("."):
-                new_value = new_value[item]
-        except KeyError:
-            new_value = None
+    def check_update(
+        self, reference_obj, prop, simulate: bool = False, src_value=None, dest_value=None
+    ):
+        print_prop = prop.replace("content.", "")
+        if print_prop in self.SUBTYPE.SYNC_EXCLUDE:
+            logging.info(
+                f"Ignoring {type(reference_obj).__name__} update '{reference_obj.name}' for "
+                + f"'{print_prop}' with '{src_value}'."
+            )
+            return False
 
-        if (
-            old_value in [None, "-1"]
-            and new_value in [None, "-1"]
-            or prop.replace("content.", "") in self.SUBTYPE.SYNC_EXCLUDE
-        ):
+        # # Determine OLD value
+        # print(f"Determining old value for {reference_obj.name} : {prop}")
+        # try:
+        #     old_value = self._accessor[reference_obj.name]
+        #     for item in prop.split("."):
+        #         if hasattr(old_value, "__dict__"):
+        #             old_value = old_value[item]
+        #         elif isinstance(old_value, list) and item.isdigit():
+        #             old_value = old_value[int(item)]
+        #         else:
+        #             old_value = None
+        #         # print(old_value)
+        # except KeyError:
+        #     old_value = None
+        # # Determine NEW value
+        # new_value = reference_obj
+        # try:
+        #     for item in prop.split("."):
+        #         if isinstance(new_value, dict) and item in new_value.keys():
+        #             new_value = new_value[item]
+        #         elif isinstance(new_value, list) and item.isdigit():
+        #             new_value = new_value[item]
+        #         else:
+        #             new_value = None
+        # except KeyError:
+        #     new_value = None
+
+        if dest_value in [None, "-1"] and src_value in [None, "-1"]:
             logging.info(
-                f"Ignoring {self.__name__} update '{reference_obj.name}' for "
-                + f"'{prop.replace('content.','')}' from '{old_value}' to '{new_value}'."
+                f"Ignoring {type(reference_obj).__name__} update '{reference_obj.name}' for "
+                + f"'{print_prop}' from '{dest_value}' to '{src_value}'."
             )
-            return False, None
-        if (
-            self._interactive
-            and not inquirer.confirm(
-                message=f"Do you want to update {self.__name__} '{reference_obj.name}' prop named "
-                + f"{prop.replace('content.','')} from '{old_value}' to '{new_value}'?",
+            return False
+        if print_prop == "capabilities":
+            if src_value is not None and not src_value in self.client.capabilities:
+                logging.error(
+                    f"Can not assign capability '{src_value}' to {type(reference_obj).__name__} " 
+                    + f"'{reference_obj.name}' as it does not exist on destination instance!"
+                )
+                return False
+        if self._interactive:
+            if dest_value is None and src_value is not None:
+                if not inquirer.confirm(
+                message=f"Do you want to set {self.__name__} '{reference_obj.name}' prop named "
+                + f"'{print_prop}' to '{src_value}'?",
                 default=False,
-            ).execute()
-        ):
-            logging.info(
-                f"Skipping {self.__name__} update '{reference_obj.name}' for "
-                + f"'{prop.replace('content.','')}' from '{old_value}' to '{new_value}'."
-            )
-            return False, None
+                ).execute():
+                    logging.info(
+                        f"Skipping {self.__name__} update '{reference_obj.name}' for "
+                        + f"'{print_prop}' from '{dest_value}' to '{src_value}'."
+                    )
+                    return False
+            elif dest_value is not None and src_value is None:
+                if not inquirer.confirm(
+                    message=f"Do you want to unset {self.__name__} '{reference_obj.name}' prop named "
+                    + f"'{print_prop}' of '{dest_value}'?",
+                    default=False,
+                ).execute():
+                    logging.info(
+                        f"Skipping {self.__name__} update '{reference_obj.name}' for "
+                        + f"'{print_prop}' from '{dest_value}' to '{src_value}'."
+                    )
+                    return False
+            elif not inquirer.confirm(
+                message=f"Do you want to update {self.__name__} '{reference_obj.name}' prop named "
+                + f"'{print_prop}' from '{dest_value}' to '{src_value}'?",
+                default=False,
+            ).execute():
+                logging.info(
+                    f"Skipping {self.__name__} update '{reference_obj.name}' for "
+                    + f"'{print_prop}' from '{dest_value}' to '{src_value}'."
+                )
+                return False
         if simulate:
             logging.info(
                 f"Simulated {self.__name__} update '{reference_obj.name}' for "
-                + f"'{prop.replace('content.','')}' from '{old_value}' to '{new_value}'."
+                + f"'{print_prop}' from '{dest_value}' to '{src_value}'."
             )
-            return False, None
-        logging.info(
-            f"Updating {self.__name__} entity '{reference_obj.name}' prop "
-            + f"'{prop.replace('content.','')}' from '{old_value}' to '{new_value}'."
-        )
-        return True, new_value
+            return False
+        if src_value is not None and dest_value is None:
+            logging.info(
+                f"Setting {self.__name__} entity '{reference_obj.name}' prop "
+                + f"'{print_prop}' with value '{src_value}'."
+            )
+        elif src_value is None and dest_value is not None:
+            logging.info(
+                f"Unsetting {self.__name__} entity '{reference_obj.name}' prop "
+                + f"'{print_prop}' of value '{dest_value}'."
+            )
+        else:
+            logging.info(
+                f"Updating {self.__name__} entity '{reference_obj.name}' prop "
+                + f"'{print_prop}' from '{src_value}' to '{dest_value}'."
+            )
+        return True
 
-    def _update(self, reference_obj, prop, simulate: bool = False):
-        update, new_value = self.check_update(
+    def _update(self, reference_obj, prop, simulate: bool = False, src_value=None, dest_value=None):
+        update = self.check_update(
             reference_obj=reference_obj,
             prop=prop,
             simulate=simulate,
+            src_value=src_value,
+            dest_value=dest_value,
         )
+        # print(update)
         if not update:
             return
-        logging.info(
-            f"Updating {self.__name__} on {self.client.host}: {prop.replace('content.','')}"
-        )
+
         try:
-            self._accessor[reference_obj.name].update(**{prop.replace("content.", ""): new_value})
+            if prop == "content.capabilities":
+                if dest_value is None and not src_value is None:
+                    response = self._accessor[reference_obj.name].grant(src_value)
+                else:
+                    response = self._accessor[reference_obj.name].revoke(src_value)
+            else:
+                response = self._accessor[reference_obj.name].update(
+                    **{prop.replace("content.", ""): src_value}
+                )
+            self._accessor[reference_obj.name].refresh()
+            logging.info(response)
+            print(response)
         except spl_context.HTTPError as error:
             logging.error(error)
 
@@ -337,15 +415,15 @@ class ObjectList:
             # Context based selection
             if ("_state" in item.__dict__ and "access" in item.__dict__["_state"]) and (
                 (
-                    self.client.namespace["app"] is not None
+                    self.client.namespace["app"] not in ["-", None]
                     and self.client.namespace["app"] != item.access.app
                 )
                 or (
-                    self.client.namespace["sharing"] is not None
+                    self.client.namespace["sharing"] not in ["-", None]
                     and self.client.namespace["sharing"] != item.access.sharing
                 )
                 or (
-                    self.client.namespace["owner"] is not None
+                    self.client.namespace["owner"] not in ["-", None]
                     and self.client.namespace["owner"] != item.access.owner
                 )
             ):
@@ -390,8 +468,16 @@ class ObjectList:
                     item.access["app"],
                     item.access["sharing"],
                     item.access["owner"],
-                    ", ".join(item.access["perms"]["read"]),
-                    ", ".join(item.access["perms"]["write"]),
+                    ", ".join(item.access["perms"]["read"])
+                    if "access" in item.__dict__.keys()
+                    and "perms" in item.access.keys()
+                    and "read" in item.access["perms"].keys()
+                    else "",
+                    ", ".join(item.access["perms"]["write"])
+                    if "access" in item.__dict__.keys()
+                    and "perms" in item.access.keys()
+                    and "write" in item.access["perms"].keys()
+                    else "",
                 ]
             table.add_row(*list(str(prop) for prop in row))
         console = Console()
@@ -415,7 +501,7 @@ class User(Object):
             "Default App": "defaultApp",
         },
     }
-    SYNC_EXCLUDE = ["capabilities", "password", "last_successful_login"]
+    SYNC_EXCLUDE = ["capabilities", "password", "last_successful_login", "defaultAppIsUserOverride", "defaultAppSourceRole", "type"]
     __name__ = "User"
 
 
@@ -431,6 +517,16 @@ class Users(ObjectList):
             dest_client=dest_client,
             dest_client_accessor=dest_client.users.list(),
         )
+
+    def _migrate_capabilities(self, reference_obj, prop, simulate: bool = False):
+        prop = prop.replace("capabilities.", "")
+        src_capabilities = reference_obj.capabilities
+        dest_capabilities = self._accessor[reference_obj.name].capabilities
+        missing = [
+            capability for capability in src_capabilities if capability not in dest_capabilities
+        ]
+        # print(prop)
+        # print(missing)
 
 
 class Index(Object):
@@ -514,7 +610,7 @@ class Role(Object):
             "Search earliest": "srchTimeEarliest",
         },
     }
-    SYNC_EXCLUDE = []
+    SYNC_EXCLUDE = ["imported_capabilities", "imported_srchIndexesAllowed", "imported_srchIndexesDefault"]
     __name__ = "Role"
 
 
@@ -564,7 +660,10 @@ class EventTypes(ObjectList):
 
 class SavedSearch(Object):
 
-    OVERVIEW_FIELDS = {"Name": None, "Search": "search"}
+    OVERVIEW_FIELDS = {
+        "Name": None,
+        # "Search": "search"
+    }
     DETAIL_FIELDS = {
         **OVERVIEW_FIELDS,
         **{

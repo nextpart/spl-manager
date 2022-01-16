@@ -113,11 +113,12 @@ class ConnectionAdapter:
         """
         if context:
             self._log.info(f"Determining namespace/context for connection '{self._name}'")
-        app_list = [None] + [
+        app_list = ["-", None] + [
             app.name for app in self.client.apps.list() if app.content.disabled != "1"
         ]
-        owner_list = [None, "nobody"] + [user.name for user in self.client.users.list()]
-        sharing_list = [None, "global", "system", "app", "user"]
+        owner_list = [None, "-", "nobody"] + [user.name for user in self.client.users.list()]
+        sharing_list = [None,"-", "global", "system", "app", "user"]
+        # APP
         if context and self._interactive and app is None:
             self.app = inquirer.select(
                 message=f"Select an application context for {self._name}:",
@@ -128,6 +129,7 @@ class ConnectionAdapter:
             raise ValueError(f"Application '{app}' does not exist")
         else:
             self.app = app
+        # SHARING
         if context and self._interactive and sharing is None:
             self.sharing = inquirer.select(
                 message="Select a sharing level:",
@@ -138,7 +140,7 @@ class ConnectionAdapter:
             raise ValueError("Invalid sharing mode")
         else:
             self.sharing = sharing
-
+        # OWNER
         if context and self._interactive and owner is None:
             self.owner = inquirer.select(
                 message="Select an owner:",
@@ -149,9 +151,16 @@ class ConnectionAdapter:
             raise ValueError("User does not exist")
         else:
             self.owner = owner
-        self.client.namespace = spl_context.namespace(
-            sharing=self.sharing,
-            app=self.app,
-            owner=self.owner,
-        )
+        if self.app is not None:
+            self.client.namespace["app"] = self.app
+        if self.sharing is not None:    
+            self.client.namespace["sharing"] = self.sharing
+        if self.owner is not None:
+            self.client.namespace["owner"] = self.owner
+        # self.client.namespace = spl_context.namespace(
+        #     sharing=self.sharing,
+        #     app=self.app,
+        #     owner=self.owner,
+        # )#
+        self._log.info(f"Switched to namespace: {self.client.namespace} for current execution.")
         return self.client.namespace

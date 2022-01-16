@@ -187,7 +187,7 @@ class DockerManager:
                 cmd=(
                     "bash -c '"
                     + "find . -name app.conf"
-                    + r" -exec dirname {} \; | xargs dirname ;"
+                    + r" -exec dirname {} \; | xargs dirname"
                     + "'"
                 ),
             )["Id"]
@@ -375,16 +375,18 @@ class DockerManager:
         """
         container_apps = self._get_custom_apps_installed_in_container()
         selected_apps = []
-        if self._interactive:
+        if self._interactive and not app_name:
             selected_apps = inquirer.checkbox(
                 message="For which apps should the permissions be fixed on your instance?",
                 choices=container_apps,
                 default=container_apps,
             ).execute()
+        elif app_name and app_name in container_apps:
+            selected_apps.append(app_name) 
         else:
             for app in container_apps:
                 selected_apps.append(app)
-        for app_name in track(selected_apps):
+        for app_name in selected_apps:
             execution = self._docker.exec_create(
                 container="splunk",
                 workdir="/opt/splunk/etc/apps",

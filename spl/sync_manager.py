@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 import logging
 from typing import Tuple
-
 import splunklib.client as spl_client
 from InquirerPy import inquirer
 from rich import print  # pylint: disable=W0622
@@ -58,6 +57,7 @@ class SyncManager:
             actions={
                 "create": self.dest.users._create,
                 "delete": self.dest.users._delete,
+                # "capabilities": self.dest.users._migrate_capabilities,
                 "*": self.dest.users._update,
             },
         ).sync(create=create, update=update, delete=delete, simulate=simulate)
@@ -186,6 +186,7 @@ class SyncManager:
             self.simulate = simulate
             self.diff = self._diff_gen(self.src.client, self.dest.client)
             print(self.diff)
+            self._log.info(self.diff)
             if create:
                 self._create()
                 self.diff = self._diff_gen(self.src.client, self.dest.client)
@@ -202,7 +203,7 @@ class SyncManager:
                 items = [
                     item
                     for item, prop in [
-                        self._sanitize_item_path(item)
+                        self._sanitize_item_item(item)
                         for item in self.diff["dictionary_item_removed"]
                     ]
                     if prop == ""  # Add property in update.
@@ -229,7 +230,7 @@ class SyncManager:
                 items = [
                     item
                     for item, property in [
-                        self._sanitize_item_path(item)
+                        self._sanitize_item_item(item)
                         for item in self.diff["dictionary_item_added"]
                     ]
                     if property == ""  # Remove properties in update.
@@ -256,36 +257,52 @@ class SyncManager:
                 "type_changes",
             ]:
                 if mode in self.diff:
-                    items = [
-                        (entity_name, sanitized_path)
-                        for entity_name, sanitized_path in [
-                            self._sanitize_item_path(item) for item in self.diff[mode]
-                        ]
-                        if sanitized_path != ""
-                    ]
-                    for entity_name, sanitized_path in items:
-                        print_path = sanitized_path.replace("content.", "")
+                    # items = [
+                    #     (entity_name, sanitized_item)
+                    #     for entity_name, sanitized_item in [
+                    #         self._sanitize_item_item(item) for item in self.diff[mode]
+                    #     ]
+                    #     if sanitized_item != ""
+                    # ]
+                    # for entity_name, sanitized_item in items:
+                    for item in self.diff[mode]:
+                        (entity_name, sanitized_item) = self._sanitize_item_item(item)
+                        if sanitized_item == "":
+                            continue
+                        print_item = sanitized_item.replace("content.", "")
                         self._log.debug(
-                            f"Different '{self.subject.__name__}' property '{print_path}' for "
+                            f"Different '{self.subject.__name__}' property '{print_item}' for "
                             + f"'{entity_name}'."
                         )
                         if (
-                            sanitized_path not in self._sync_actions
+                            sanitized_item not in self._sync_actions
                             and "*" not in self._sync_actions.keys()
                         ):
                             self._log.debug(
-                                f"Ignoring '{self.subject.__name__}' update '{print_path}' for"
-                                + f" '{entity_name}'."
+                                f"Ignoring '{self.subject.__name__}' update '{print_item}' for"
+                                + f" property '{entity_name}'."
                             )
                             continue
-                        if sanitized_path in self._sync_actions or "*" in self._sync_actions:
+                        if sanitized_item in self._sync_actions or "*" in self._sync_actions:
+                            # sanitized_item = sanitized_item.replace("content.", "")
                             try:
+                                src_value = None
+                                dest_value = None
+                                if isinstance(self.diff[mode], dict):
+                                    if isinstance(self.diff[mode][item], dict):
+                                        dest_value = self.diff[mode][item]["old_value"]
+                                        src_value = self.diff[mode][item]["new_value"]
+                                    else:
+                                        src_value = self.diff[mode][item]
+                                        
                                 self._sync_actions[
-                                    sanitized_path if sanitized_path in self._sync_actions else "*"
+                                    sanitized_item if sanitized_item in self._sync_actions else "*"
                                 ](
                                     reference_obj=self.accessor[entity_name],
-                                    prop=sanitized_path,
+                                    prop=sanitized_item,
                                     simulate=self.simulate,
+                                    src_value=src_value,
+                                    dest_value=dest_value,
                                 )
                             except KeyError:
                                 self._log.error(
@@ -295,21 +312,25 @@ class SyncManager:
                         else:
                             self._log.info(
                                 f"No '{self.subject.__name__}' action defined to update "
-                                + f"'{print_path}' property for '{entity_name}'."
+                                + f"'{print_item}' property for '{entity_name}'."
                             )
 
         @staticmethod
-        def _sanitize_item_path(item) -> Tuple[str, str]:
+        def _sanitize_item_item(item) -> Tuple[str, str]:
             """Remove 'root' and unnecessary brackets aka convert to dot notation.
 
-            Returns entity name and sanitized path as tuple.
+            Returns entity name and sanitized item as tuple.
             """
-            split_path = (
-                item.replace("root[", "")
-                .replace("]['", ".")
-                .replace("'", "")
-                .replace("]", "")
-                .replace("[", "")
-                .split(".")
+            # split_item = (
+            #     item.replace("root[", "")
+            #     .replace("][", ".")
+            #     .replace("'", "")
+            #     .replace("]", "")
+            #     .replace("[", "")
+            #     .split(".")
+            # )
+            # return split_item[0], ".".join([item for item in split_item[1:] if not item.isdigit()])
+            return (
+                item[: item.index("']")].replace("root['", ""),
+                item[item.index("']") : item.rindex("']")].replace("']['", ".")[1:],
             )
-            return split_path[0], ".".join([path for path in split_path[1:] if not path.isdigit()])
