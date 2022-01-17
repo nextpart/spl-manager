@@ -6,7 +6,6 @@ import splunklib.binding as spl_context
 import splunklib.client as spl_client
 from deepdiff import DeepDiff
 from InquirerPy import inquirer
-
 from rich import print  # pylint: disable=W0622
 from rich.console import Console
 from rich.progress import track
@@ -100,21 +99,6 @@ class ObjectList:
                     "content": item.content
                 }
                 for item in src_client_accessor
-                # if not ("_state" in item.__dict__ and "access" in item.__dict__["_state"])
-                # or (
-                #     (
-                #         src_client.namespace["app"] not in ["-", None]
-                #         or src_client.namespace["app"] == item.access.app
-                #     )
-                #     and (
-                #         src_client.namespace["sharing"] not in ["-", None]
-                #         or src_client.namespace["sharing"] == item.access.sharing
-                #     )
-                #     and (
-                #         src_client.namespace["owner"] not in ["-", None]
-                #         or src_client.namespace["owner"] == item.access.owner
-                #     )
-                # )
             },
             {
                 str(item.name): {
@@ -122,24 +106,65 @@ class ObjectList:
                     "content": item.content
                 }
                 for item in dest_client_accessor
-                # if not ("_state" in item.__dict__ and "access" in item.__dict__["_state"])
-                # or (
-                #     (
-                #         dest_client.namespace["app"] not in ["-", None]
-                #         or dest_client.namespace["app"] == item.access.app
-                #     )
-                #     and (
-                #         dest_client.namespace["sharing"] not in ["-", None]
-                #         or dest_client.namespace["sharing"] == item.access.sharing
-                #     )
-                #     and (
-                #         dest_client.namespace["owner"] not in ["-", None]
-                #         or dest_client.namespace["owner"] == item.access.owner
-                #     )
-                # )
             },
             ignore_order=True,
         )
+
+    def get_args_right(self, reference_obj):
+        args = {
+            field: reference_obj.content[field]
+            for field in reference_obj.__dict__["_state"]["content"].keys()
+            if field in reference_obj.content
+            and reference_obj.content[field] is not None
+            and reference_obj.content[field] != "-1"
+            and reference_obj.fields["required"] + reference_obj.fields["optional"]
+            and field not in self.SUBTYPE.SYNC_EXCLUDE + ["defaultApp"]
+        }
+
+        # Check if required capabilities exist on target system
+        if (
+            "capabilities" in reference_obj.fields["required"]
+            or "capabilities" in reference_obj.fields["optional"]
+        ):
+            args["capabilities"] = []
+            for capability in reference_obj.capabilities:
+                if capability in self.client.capabilities:
+                    args["capabilities"].append(capability)
+                else:
+                    logging.warning(
+                        f"The {self.__name__} {reference_obj.name} has an unknown capability "
+                        + f"('{capability}') assigned. We'll skip this assignment."
+                    )
+
+        if (
+            "defaultApp" in reference_obj.fields["required"]
+            or "defaultApp" in reference_obj.fields["optional"]
+        ):
+            # args["defaultApp"] = None
+            # reference_obj["defaultApp"] is None or
+            if reference_obj["defaultApp"] in [app.name for app in self.client.apps.list()]:
+                args["defaultApp"] = reference_obj["defaultApp"]
+            elif reference_obj["defaultApp"]:
+                logging.warning(
+                    f"The {self.__name__} {reference_obj.name} has an unknown default App "
+                    + f"('{reference_obj['defaultApp']}') assigned. We'll skip this assignment."
+                )
+
+        # Check if required roles exist on target system
+        if (
+            "roles" in reference_obj.fields["required"]
+            or "roles" in reference_obj.fields["optional"]
+        ):
+            args["roles"] = []
+            for role in reference_obj.roles:
+                if role in self.client.roles:
+                    args["roles"].append(role)
+                else:
+                    logging.warning(
+                        f"The {self.__name__} {reference_obj.name} has an unknown role "
+                        + f"('{role}') assigned. We'll skip this assignment."
+                    )
+        return args
 
     def check_create(self, reference_obj, simulate: bool = False) -> bool:
         """Object item creation verification by user/args or simulation.
@@ -171,14 +196,18 @@ class ObjectList:
     def _create(self, reference_obj, simulate: bool = False):
         if not self.check_create(reference_obj=reference_obj, simulate=simulate):
             return
-        # print(reference_obj.fields["required"] + reference_obj.fields["optional"])
+
         args = {
             field: reference_obj.content[field]
-            for field in reference_obj.__dict__["_state"]["content"].keys() # reference_obj.fields["required"] + reference_obj.fields["optional"]
+            for field in reference_obj.__dict__["_state"]["content"].keys()
             if field in reference_obj.content
             and reference_obj.content[field] is not None
             and reference_obj.content[field] != "-1"
-            and field not in self.SUBTYPE.SYNC_EXCLUDE
+            and field not in self.SUBTYPE.SYNC_EXCLUDE + ["defaultApp"]
+            and (
+                reference_obj.fields["required"] + reference_obj.fields["optional"] == []
+                or field in reference_obj.fields["required"] + reference_obj.fields["optional"]
+            )
         }
 
         # Check if required capabilities exist on target system
@@ -195,27 +224,31 @@ class ObjectList:
                         f"The {self.__name__} {reference_obj.name} has an unknown capability "
                         + f"('{capability}') assigned. We'll skip this assignment."
                     )
-
-        # Check if required roles exist on target system
         if (
-            "roles" in reference_obj.fields["required"]
-            or "roles" in reference_obj.fields["optional"]
+            "imported_roles" in reference_obj.fields["required"]
+            or "imported_roles" in reference_obj.fields["optional"]
         ):
-            args["roles"] = []
-            for role in reference_obj.roles:
-                if role in self.client.roles:
-                    args["roles"].append(role)
+            args["imported_roles"] = []
+            for imported_role in reference_obj.content["imported_roles"]:
+                if imported_role in [role.name for role in self.client.roles.list()]:
+                    args["imported_roles"].append(imported_role)
                 else:
                     logging.warning(
-                        f"The {self.__name__} {reference_obj.name} has an unknown role "
-                        + f"('{role}') assigned. We'll skip this assignment."
+                        f"The {self.__name__} {reference_obj.name} has an unknown imported role "
+                        + f"('{imported_role}'). We'll skip this assignment."
                     )
+        if (
+            "defaultApp" in reference_obj.fields["required"]
+            or "defaultApp" in reference_obj.fields["optional"]
+        ):
+            if reference_obj["defaultApp"] in [app.name for app in self.client.apps.list()]:
+                args["defaultApp"] = reference_obj["defaultApp"]
+            elif reference_obj["defaultApp"]:
+                logging.warning(
+                    f"The {self.__name__} {reference_obj.name} has an unknown default App "
+                    + f"('{reference_obj['defaultApp']}') assigned. We'll skip this assignment."
+                )
 
-        print(f"{args}")
-
-        # if "access" in reference_obj.__dict__.keys():
-        #     print(reference_obj.access)
-        
         try:
             if isinstance(reference_obj, spl_client.User):
                 self._accessor.create(
@@ -229,40 +262,34 @@ class ObjectList:
     def check_update(
         self, reference_obj, prop, simulate: bool = False, src_value=None, dest_value=None
     ):
+        # Cut 'content.' from prop
         print_prop = prop.replace("content.", "")
-        if print_prop in self.SUBTYPE.SYNC_EXCLUDE:
+        # if print_prop in self.SUBTYPE.SYNC_EXCLUDE:
+        #     logging.info(
+        #         f"Ignoring {type(reference_obj).__name__} update '{reference_obj.name}' for "
+        #         + f"'{print_prop}' with '{src_value}'."
+        #     )
+        #     return False
+
+        if not (
+            print_prop in self._accessor[reference_obj.name].content
+            and self._accessor[reference_obj.name].content[print_prop] is not None
+            and self._accessor[reference_obj.name].content[print_prop] != "-1"
+            and print_prop not in self.SUBTYPE.SYNC_EXCLUDE + ["defaultApp"]
+            and (
+                self._accessor[reference_obj.name].fields["required"]
+                + self._accessor[reference_obj.name].fields["optional"]
+                == []
+                or print_prop
+                in self._accessor[reference_obj.name].fields["required"]
+                + self._accessor[reference_obj.name].fields["optional"]
+            )
+        ):
             logging.info(
                 f"Ignoring {type(reference_obj).__name__} update '{reference_obj.name}' for "
-                + f"'{print_prop}' with '{src_value}'."
+                + f"'{print_prop}' from '{dest_value}' to '{src_value}'."
             )
             return False
-
-        # # Determine OLD value
-        # print(f"Determining old value for {reference_obj.name} : {prop}")
-        # try:
-        #     old_value = self._accessor[reference_obj.name]
-        #     for item in prop.split("."):
-        #         if hasattr(old_value, "__dict__"):
-        #             old_value = old_value[item]
-        #         elif isinstance(old_value, list) and item.isdigit():
-        #             old_value = old_value[int(item)]
-        #         else:
-        #             old_value = None
-        #         # print(old_value)
-        # except KeyError:
-        #     old_value = None
-        # # Determine NEW value
-        # new_value = reference_obj
-        # try:
-        #     for item in prop.split("."):
-        #         if isinstance(new_value, dict) and item in new_value.keys():
-        #             new_value = new_value[item]
-        #         elif isinstance(new_value, list) and item.isdigit():
-        #             new_value = new_value[item]
-        #         else:
-        #             new_value = None
-        # except KeyError:
-        #     new_value = None
 
         if dest_value in [None, "-1"] and src_value in [None, "-1"]:
             logging.info(
@@ -273,16 +300,35 @@ class ObjectList:
         if print_prop == "capabilities":
             if src_value is not None and not src_value in self.client.capabilities:
                 logging.error(
-                    f"Can not assign capability '{src_value}' to {type(reference_obj).__name__} " 
+                    f"Can not assign capability '{src_value}' to {type(reference_obj).__name__} "
                     + f"'{reference_obj.name}' as it does not exist on destination instance!"
                 )
                 return False
+        if print_prop == "defaultApp":
+            if src_value is not None and not src_value in [
+                app.name for app in self.client.apps.list()
+            ]:
+                logging.error(
+                    f"Can not assign default app '{src_value}' to {type(reference_obj).__name__} "
+                    + f"'{reference_obj.name}' as it does not exist on destination instance!"
+                )
+                return False
+        if print_prop == "imported_roles":
+            if src_value is not None and not src_value in [
+                role.name for role in self.client.roles.list()
+            ]:
+                logging.error(
+                    f"Can not assign role '{src_value}' to {type(reference_obj).__name__} "
+                    + f"'{reference_obj.name}' as it does not exist on destination instance!"
+                )
+                return False
+        # USER QUESTION
         if self._interactive:
             if dest_value is None and src_value is not None:
                 if not inquirer.confirm(
-                message=f"Do you want to set {self.__name__} '{reference_obj.name}' prop named "
-                + f"'{print_prop}' to '{src_value}'?",
-                default=False,
+                    message=f"Do you want to set {self.__name__} '{reference_obj.name}' prop named "
+                    + f"'{print_prop}' to '{src_value}'?",
+                    default=False,
                 ).execute():
                     logging.info(
                         f"Skipping {self.__name__} update '{reference_obj.name}' for "
@@ -341,10 +387,16 @@ class ObjectList:
             src_value=src_value,
             dest_value=dest_value,
         )
-        # print(update)
         if not update:
             return
-
+        if isinstance(
+            self._accessor[reference_obj.name].content[prop.replace("content.", "")], list
+        ):
+            dest_value = (
+                self._accessor[reference_obj.name]
+                .content[prop.replace("content.", "")]
+                .append(dest_value)
+            )
         try:
             if prop == "content.capabilities":
                 if dest_value is None and not src_value is None:
@@ -357,7 +409,7 @@ class ObjectList:
                 )
             self._accessor[reference_obj.name].refresh()
             logging.info(response)
-            print(response)
+            # print(response)
         except spl_context.HTTPError as error:
             logging.error(error)
 
@@ -578,6 +630,7 @@ class Index(Object):
         },
     }
     SYNC_EXCLUDE = []
+    STATIC_VALUES = {"archiver.maxDataArchiveRetentionPeriod": "0"}
     __name__ = "Index"
 
 
@@ -604,7 +657,7 @@ class Input(Object):
         **OVERVIEW_FIELDS,
         **{},
     }
-    SYNC_EXCLUDE = []
+    SYNC_EXCLUDE = ["assureUTF8"]
     __name__ = "Input"
 
 
@@ -644,7 +697,7 @@ class Role(Object):
         "imported_srchIndexesDefault",
         "imported_rtSrchJobsQuota",
         "imported_srchDiskQuota",
-        "imported_srchJobsQuota"
+        "imported_srchJobsQuota",
     ]
     __name__ = "Role"
 
@@ -677,9 +730,7 @@ class SavedSearch(Object):
             "Scheduled": "is_scheduled",
         },
     }
-    SYNC_EXCLUDE = [
-        "embed.enabled"
-    ]
+    SYNC_EXCLUDE = ["embed.enabled"]
     __name__ = "SavedSearch"
 
 
@@ -714,7 +765,14 @@ class User(Object):
             "Default App": "defaultApp",
         },
     }
-    SYNC_EXCLUDE = ["capabilities", "password", "last_successful_login", "defaultAppIsUserOverride", "defaultAppSourceRole", "type"]
+    SYNC_EXCLUDE = [
+        "capabilities",
+        "password",
+        "last_successful_login",
+        "defaultAppIsUserOverride",
+        "defaultAppSourceRole",
+        "type",
+    ]
     __name__ = "User"
 
 

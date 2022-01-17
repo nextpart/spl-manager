@@ -24,30 +24,18 @@ default:
   #     handlers: [console]
 
   samples:
-    WinHostMon:
-      src: rb-onprem
+    SomeOS:
+      src: onprem
       query: |
-        index="*"
-      earliest: -7d@d
-      latest: now
-    Aruba:
-      src: rb-onprem
-      query: |
-        index="*"
-      earliest: -7d@d
-      latest: now
-    GuardiaOS:
-      src: nxtp-onprem
-      query: |
-        index="guardia-os" environment="development"
+        index="some-os" environment="development"
         | reverse
         | table index, host, source, sourcetype, _raw, _time
       earliest: -1d@d
       latest: now
-    GuardiaApp:
-      src: nxtp-onprem
+    SomeApp:
+      src: onprem
       query: |
-        index="guardia-app" environment="development"
+        index="some-app" environment="development"
         | reverse
         | table index, host, source, sourcetype, _raw, _time
       earliest: -7d@d
@@ -56,79 +44,42 @@ default:
     auth_uri: https://api.splunk.com/2.0/rest/login/splunk
     appinspect_uri: https://appinspect.splunk.com/v1/app
     apps:
-      addon_builder:
-        id: "2962"
-        version: 4.0.0
-      # azure_app:
-      #   id: "4882"
-      #   version: 1.1.0
-      azure_ta:
-        id: "3757"
-        version: 3.2.0
-      cim:
-        id: "1621"
-        version: 4.20.2
-      dashboards_app:
-        id: "4710"
-        version: 0.9.0
-      # essential:
-      #   id: "5512"
-      #   version: 1.0.0
-      eventgen:
-        id: "1924"
-        version: 7.2.1
-      # horizon_viz:
-      #   id: "3117"
-      #   version: 1.5.0
-      # infra_ta:
-      #   id: "4217"
-      #   version: 2.2.4
-      # it_essential:
-      #   id: "5390"
-      #   version: 1.1.2
-      # knowledge_objects_app:
-      #   id: "5399"
-      #   version: 1.0.26
-      lookup_edit:
-        id: "1724"
-        version: 3.5.0
-      # monitor_alert_pack:
-      #   id: "4808"
-      #   version: 2.0.3
-      # ms_cloud_ta:
-      #   id: "3110"
-      #   version: 4.2.0
-      ms_graph_ta:
-        id: "4564"
-        version: 1.2.3
-      # nix_ta:
-      #   id: "833"
-      #   version: 8.3.1
-      o365_app:
-        id: "3786"
-        version: 3.2.2
-      o365_ta:
-        id: "4055"
-        version: 2.2.0
-      # sankey_viz:
-      #   id: "3112"
-      #   version: 1.6.0
-      # sec_essential:
-      #   id: "3435"
-      #   version: 3.4.0
-      servicenow_ta:
-        id: "1928"
-        version: 7.1.1
-      # stream_forwarders:
-      #   id: "5238"
-      #   version: 8.0.1
-      timeline_viz:
-        id: "3120"
-        version: 1.6.1
+      addon_builder: { id: "2962", version: 4.0.0 }
+      aruba_ta: { id: "4668", version: 0.1.4 }
+      azure_app: { id: "4882", version: 1.1.0 }
+      azure_ta: { id: "3757", version: 3.2.0 }
+      calendar_heatmap_viz: { id: "3162", version: 1.5.0 }
+      cim: { id: "1621", version: 4.20.2 }
+      cisco_asa: { id: "1620", version: 4.2.0 }
+      cisco_ios_app: { id: "1352", version: 2.7.1 }
+      cisco_ios_ta: { id: "1467", version: 2.7.2 }
+      cisco_ise_app: { id: "1589", version: 2.1.2 }
+      cisco_ise_ta: { id: "1589", version: 2.1.2 }
+      dashboards_app: { id: "4710", version: 0.9.0 }
+      essential: { id: "5512", version: 1.0.0 }
+      eventgen: { id: "1924", version: 7.2.1 }
+      horizon_viz: { id: "3117", version: 1.5.0 }
+      infra_ta: { id: "4217", version: 2.2.4 }
+      it_essential: { id: "5390", version: 1.1.2 }
+      knowledge_objects_app: { id: "5399", version: 1.0.26 }
+      lookup_edit: { id: "1724", version: 3.5.0 }
+      meraki_ta: { id: "3018", version: 1.1.5 }
+      monitor_alert_pack: { id: "4808", version: 2.0.3 }
+      ms_cloud_ta: { id: "3110", version: 4.2.0 }
+      ms_graph_ta: { id: "4564", version: 1.2.3 }
+      nix_ta: { id: "833", version: 8.4.0 }
+      o365_app: { id: "3786", version: 3.2.2 }
+      o365_ta: { id: "4055", version: 2.2.0 }
+      paloalto_app: { id: "491", version: 7.0.3 }
+      paloalto_ta: { id: "2757", version: 7.0.3 }
+      sankey_viz: { id: "3112", version: 1.6.0 }
+      sec_essential: { id: "3435", version: 3.4.0 }
+      servicenow_ta: { id: "1928", version: 7.1.1 }
+      timeline_viz: { id: "3120", version: 1.6.1 }
+      windows_dhcp_ta: { id: "4359", version: 1.2.0 }
   docker:
     socket: unix://var/run/docker.sock
-    image: splunk/splunk:8.2.4
-    package_image: nextpartdev.azurecr.io/splunk/package:dev
+    image: splunk/splunk:8.1-debian
     environment:
       SPLUNK_START_ARGS: --accept-license
       SPLUNK_ENABLE_LISTEN: 9997

@@ -2,7 +2,6 @@
 
 from typing import Optional
 
-import splunklib.binding as spl_context
 import splunklib.client as spl_client
 from InquirerPy import inquirer
 from rich import inspect, print  # pylint: disable=W0622
@@ -117,7 +116,7 @@ class ConnectionAdapter:
             app.name for app in self.client.apps.list() if app.content.disabled != "1"
         ]
         owner_list = [None, "-", "nobody"] + [user.name for user in self.client.users.list()]
-        sharing_list = [None,"-", "global", "system", "app", "user"]
+        sharing_list = [None, "-", "global", "system", "app", "user"]
         # APP
         if context and self._interactive and app is None:
             self.app = inquirer.select(
@@ -153,7 +152,7 @@ class ConnectionAdapter:
             self.owner = owner
         if self.app is not None:
             self.client.namespace["app"] = self.app
-        if self.sharing is not None:    
+        if self.sharing is not None:
             self.client.namespace["sharing"] = self.sharing
         if self.owner is not None:
             self.client.namespace["owner"] = self.owner

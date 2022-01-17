@@ -1,44 +1,41 @@
 
 [build-system]
-requires = ["poetry-core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"
+requires = ["poetry-core>=1.0.0"]
 
 [tool.nitpick]
+cache = "never"
 style = [
   "https://res.gen.nxtp/files/codestyle/styles/nitpick-generic.toml",
   "https://res.gen.nxtp/files/codestyle/styles/nitpick-python.toml",
   "https://res.gen.nxtp/files/codestyle/styles/nitpick-pypackage.toml",
 ]
-cache = "never"
 
 [tool.poetry]
-name = "spl"
-version = "0.1.0"
-description = ""
-readme = 'README.md'
 authors = ["Nextpart Security Intelligence <info@nextpart.io>"]
+description = ""
+name = "spl"
+readme = 'README.md'
+version = "0.1.0"
 
 [tool.poetry.dependencies]
+Cerberus = "^1.3"
+deepdiff = "^5.7"
+docker = "^5.0"
+dynaconf = "^3.1"
+fire = "^0.4"
+inquirerpy = "^0.3"
 python = "^3.8"
-splunk-sdk = "^1.6.18"
-splunk-appinspect = "^2.11.0"
-rich = "^10.16.1"
-docker = "^5.0.3"
-inquirer = "^2.8.0"
-fire = "^0.4.0"
-dynaconf = "^3.1.7"
-inquirerpy = "^0.3.1"
-Cerberus = "^1.3.4"
-deepdiff = "^5.7.0"
-requests-toolbelt = "^0.9.1"
-
+requests-toolbelt = "^0.9"
+rich = "^11.0"
+splunk-appinspect = "^2.14"
+splunk-sdk = "^1.6"
 
 [tool.poetry.dev-dependencies]
 black = "^21.12b0"
-ipykernel = "^6.6.0"
-tox = "^3.24.4"
-pylint = "^2.12.2"
-
+ipykernel = "^6.6"
+pylint = "^2.12"
+tox = "^3.24"
 
 [tool.black]
 include = "\\.pyi?$"
@@ -46,7 +43,15 @@ line-length = 100
 
 [tool.coverage]
 [tool.coverage.report]
-exclude_lines = ["pragma: no cover", "def __repr__", "if self\\.debug", "raise AssertionError", "raise NotImplementedError", "if 0:", "if __name__ == .__main__.:"]
+exclude_lines = [
+  "pragma: no cover",
+  "def __repr__",
+  "if self\\.debug",
+  "raise AssertionError",
+  "raise NotImplementedError",
+  "if 0:",
+  "if __name__ == .__main__.:",
+]
 ignore_errors = true
 omit = ["*/site-packages/*", "*/.venv/*", "*/.tox/*", "*/.local/*", "*/tests/*"]
 

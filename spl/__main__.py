@@ -19,7 +19,14 @@ from spl.samples_manager import SamplesManager
 from spl.schemata import CONFIG_SCHEMA
 from spl.sync_manager import SyncManager
 
-logging.basicConfig(level="INFO", format="%(message)s", datefmt="[%X]", handlers=[RichHandler()])
+logFormatter = logging.Formatter("%(asctime)s [%(levelname)-5.5s] | %(message)s")
+rootLogger = logging.getLogger()
+fileHandler = logging.FileHandler(Path.cwd() / "spl.log")
+fileHandler.setFormatter(logFormatter)
+
+logging.basicConfig(
+    level="INFO", format="%(message)s", datefmt="[%X]", handlers=[RichHandler(), fileHandler]
+)
 
 
 class SplManager:
@@ -45,7 +52,10 @@ class SplManager:
         """
         self._interactive = interactive
         logging.basicConfig(
-            level=level, format="%(message)s", datefmt="[%X]", handlers=[RichHandler()]
+            level=level,
+            format="%(message)s",
+            datefmt="[%X]",
+            handlers=[RichHandler(), logging.FileHandler(Path.cwd() / "spl.log")],
         )
         self._log = logging.getLogger(__name__)
         self._log.debug("Initializing settings from file.")
@@ -142,6 +152,7 @@ class SplManager:
 
         """
         return AppsManager(self, path=path, name=name)
+
 
 # CLI Entrypoint:
 if __name__ == "__main__":

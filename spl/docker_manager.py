@@ -231,8 +231,8 @@ class DockerManager:
             dict: docker client container (re)start response dict.
         """
         seconds_to_wait = 1
-        while (container_starting := True):
-            self._container = self._get_or_create_container() # Update container instance
+        while container_starting := True:
+            self._container = self._get_or_create_container()  # Update container instance
             try:
                 if self._container["Status"] == "Created":
                     self._container = self._docker.start(self._container["Id"])
@@ -250,10 +250,9 @@ class DockerManager:
                     return self._container
             except KeyError:
                 self._log.info("Waiting for Container to start...")
-                seconds_to_wait *= 2 # Wait exponentially
+                seconds_to_wait *= 2  # Wait exponentially
                 sleep(seconds_to_wait)
                 continue
-            container_starting = False
 
     def stop(self):
         """Stop the container instance."""
@@ -395,7 +394,7 @@ class DockerManager:
                 default=container_apps,
             ).execute()
         elif app_name and app_name in container_apps:
-            selected_apps.append(app_name) 
+            selected_apps.append(app_name)
         else:
             for app in container_apps:
                 selected_apps.append(app)

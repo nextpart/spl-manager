@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import logging
 from typing import Tuple
+
 import splunklib.client as spl_client
 from InquirerPy import inquirer
 from rich import print  # pylint: disable=W0622
@@ -157,6 +158,23 @@ class SyncManager:
             },
         ).sync(create=create, update=update, delete=delete, simulate=simulate)
 
+    def confs(
+        self,
+        conf: str = None,
+        create: bool = False,
+        update: bool = False,
+        delete: bool = False,
+        simulate: bool = False,
+    ):
+
+        print(f"{conf=}")
+
+        for stanza in self.src.client.confs[conf].list():
+            print(f"{stanza.state['title']=}")
+            print(f"{stanza.fields=}")
+            print(f"{stanza.content=}")
+            print("\n")
+
     class _DiffHandler:
 
         simulate = True
@@ -293,7 +311,7 @@ class SyncManager:
                                         src_value = self.diff[mode][item]["new_value"]
                                     else:
                                         src_value = self.diff[mode][item]
-                                        
+
                                 self._sync_actions[
                                     sanitized_item if sanitized_item in self._sync_actions else "*"
                                 ](

@@ -6,7 +6,7 @@ import os
 from pathlib import Path
 from time import sleep
 from typing import Optional, Union
-import operator
+
 import docker
 import requests
 import splunk_appinspect
@@ -83,7 +83,7 @@ class AppsManager:
             )
             # except Exception as exc:
             #     self._log.warning(exc)
-        apps.sort(key = lambda x : x.package_id)  
+        apps.sort(key=lambda x: x.package_id)
         return apps
 
     def list(self, csv_file: Optional[str] = None):

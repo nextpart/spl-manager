@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 # %%
+
 from rich import print
-from pathlib import Path
+
 from spl.__main__ import SplManager
-import splunk_appinspect
 
 # %%
 spl = SplManager(src="nxtp-onprem", dest="localhost", interactive=False)
@@ -23,11 +23,6 @@ print(
         for app in spl.sync.src.client.apps.list()
     }
 )
-
-# %%
-
-"test" in {"test1": 123, "asdf": 989}.keys()
-
 
 # %%
 print(
@@ -87,113 +82,3 @@ spl.sync.dest.client.capabilities
 
 # %%
 spl.sync.src.client.users["analytics"].__dict__
-
-# %%
-spl.sync.src.client.roles["redbull"]
-
-# %%
-import splunk_appinspect
-
-# %%
-app = splunk_appinspect.App(location="../../../apps/FortiEDR_TA_nxtp", python_analyzer_enable=False)
-app
-
-# %%
-# splunk_appinspect.main.validate(["../../../apps/FortiEDR_App_nxtp"])
-# %%
-client = spl.sync.dest.client
-
-# %%
-client.namespace
-
-
-import splunklib.binding as spl_context
-
-# %%
-# %%
-from rich import print
-
-from spl.__main__ import SplManager
-
-spl = SplManager(src="nxtp-onprem", dest="localhost", interactive=False)
-client = spl.sync.src.client
-default_namespace = client.namespace
-
-
-# %%
-sync = spl.sync
-
-# %%
-manager = spl.manager(conn="nxtp-onprem")
-
-# %%
-manager.namespace(context=True, app="Splunk_SOCToolkit")
-
-
-# %%
-manager.saved_searches.generate()
-
-# %%
-client.namespace = default_namespace
-
-# %%
-client.namespace = spl_context.namespace(
-    sharing="app",
-    app="Splunk_SOCToolkit",
-    owner=None,
-)
-
-# %%
-print(
-    [
-        saved_search.name
-        for saved_search in client.saved_searches.list()
-        if saved_search.access.app == "Splunk_SOCToolkit"
-    ]
-)
-
-
-# %%
-apps =spl.apps(path=Path("../../apps"),name="*")
-apps
-
-# %%
-my_apps = apps._apps
-# %%
-my_apps[0].__dict__
-
-
-# %%
-app = splunk_appinspect.App(location=Path("../../apps/Defender_TA_nxtp"),
-python_analyzer_enable=False, 
-trusted_libs_manager=False)
-
-# %%
-my_apps.sort(key = lambda x : x.package_id)
-[app.package_id for app in my_apps]
-
-
-
-
-
-
-# %%
-from rich import print
-from pathlib import Path
-from spl.__main__ import SplManager
-import splunk_appinspect
-
-# %%
-spl = SplManager(src="rb-onprem", dest="localhost", interactive=False)
-
-# %%
-client = spl._src.client
-
-
-# %%
-[ index.name for index in client.indexes.list() ]
-
-
-# %%
-client.namespace['app'] = "SPLUNK_GLOBAL_INDEXROUTING"
-
