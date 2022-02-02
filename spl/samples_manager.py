@@ -1,4 +1,6 @@
 # -*- coding: utf-8 -*-
+"""Splunk Samples Manager."""
+
 import _thread
 import csv
 from pathlib import Path
@@ -13,11 +15,9 @@ from spl.connection_adapter import ConnectionAdapter
 
 
 class SamplesManager:
-    """[summary]
+    """Manage event samples from you Splunk instance.
 
-    # TODO: Add description
-
-    [extended_summary]
+    The SampleManager allows you to download event samples from an specified Splunk instance.
     """
 
     def __init__(self, parent: object, path: Union[Path, str] = Path.cwd()):

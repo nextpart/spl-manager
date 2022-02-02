@@ -1,4 +1,6 @@
 # -*- coding: utf-8 -*-
+# pylint: disable=R0903
+"""Manager for syncing differences of two instances."""
 import logging
 from typing import Tuple
 
@@ -70,6 +72,7 @@ class DiffConverter:
         # TODO add necessary logic for deletion of items on dest
 
     def sync_diff(self):
+        """Sync the differences between source and destination instance."""
         diff = self._diff_gen(self._src, self._dest)
         logging.info("Determine whole missing entities and transfering them.")
         self._sync_missing(diff)

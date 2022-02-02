@@ -1,17 +1,18 @@
 # -*- coding: utf-8 -*-
+# pylint: disable=R0903,R0912,R0913
+"""Splunk object abstractions."""
+
 import logging
 from datetime import datetime
+from typing import Dict, List
 
 import splunklib.binding as spl_context
 import splunklib.client as spl_client
 from deepdiff import DeepDiff
 from InquirerPy import inquirer
-from rich import print  # pylint: disable=W0622
 from rich.console import Console
 from rich.progress import track
 from rich.table import Table
-
-"""Splunk object abstractions."""
 
 TIME_FORMAT = "%d.%m.%Y %H:%M:%S"
 
@@ -53,7 +54,7 @@ class ObjectList:
     def __str__(self):
         return str([str(item) for item in self.items])
 
-    def generate(self) -> list:
+    def generate(self) -> List:
         """Object list generator.
 
         Returns:
@@ -84,33 +85,29 @@ class ObjectList:
         """Differencial comparison of object lists from two instances.
 
         Args:
-            src_client (spl.connection_adapter.ConnectionAdapter): [description]
+            src_client (spl.connection_adapter.ConnectionAdapter): Source Instance Client
             src_client_accessor (Any): Property object access, like splunklib.client.users
-            dest_client (spl.connection_adapter.ConnectionAdapter): [description]
+            dest_client (spl.connection_adapter.ConnectionAdapter): Destination Instance Client
             dest_client_accessor (Any): Property object access, like splunklib.client.users
 
         Returns:
             DeepDiff: Source and destination object property list comparison
         """
         return DeepDiff(
-            {
-                str(item.name): {
-                    # "access": item.access,
-                    "content": item.content
-                }
-                for item in src_client_accessor
-            },
-            {
-                str(item.name): {
-                    # "access": item.access,
-                    "content": item.content
-                }
-                for item in dest_client_accessor
-            },
+            {str(item.name): {"content": item.content} for item in src_client_accessor},
+            {str(item.name): {"content": item.content} for item in dest_client_accessor},
             ignore_order=True,
         )
 
-    def get_args_right(self, reference_obj):
+    def get_args_right(self, reference_obj) -> Dict:
+        """Check if specified arguments can be assigned to the Splunk instance.
+
+        Args:
+            reference_obj (Any): Reference object, like a splunklib.client.User
+
+        Returns:
+            Dict: Arguments that can be assigned to the Splunk instance.
+        """
         args = {
             field: reference_obj.content[field]
             for field in reference_obj.__dict__["_state"]["content"].keys()
@@ -140,8 +137,6 @@ class ObjectList:
             "defaultApp" in reference_obj.fields["required"]
             or "defaultApp" in reference_obj.fields["optional"]
         ):
-            # args["defaultApp"] = None
-            # reference_obj["defaultApp"] is None or
             if reference_obj["defaultApp"] in [app.name for app in self.client.apps.list()]:
                 args["defaultApp"] = reference_obj["defaultApp"]
             elif reference_obj["defaultApp"]:
@@ -262,14 +257,13 @@ class ObjectList:
     def check_update(
         self, reference_obj, prop, simulate: bool = False, src_value=None, dest_value=None
     ):
+        """Check if Splunk Objects on destination instance can be updated.
+
+        Args:
+            reference_obj (Any): Reference object, like a splunklib.client.User
+        """
         # Cut 'content.' from prop
         print_prop = prop.replace("content.", "")
-        # if print_prop in self.SUBTYPE.SYNC_EXCLUDE:
-        #     logging.info(
-        #         f"Ignoring {type(reference_obj).__name__} update '{reference_obj.name}' for "
-        #         + f"'{print_prop}' with '{src_value}'."
-        #     )
-        #     return False
 
         if not (
             print_prop in self._accessor[reference_obj.name].content
@@ -337,8 +331,8 @@ class ObjectList:
                     return False
             elif dest_value is not None and src_value is None:
                 if not inquirer.confirm(
-                    message=f"Do you want to unset {self.__name__} '{reference_obj.name}' prop named "
-                    + f"'{print_prop}' of '{dest_value}'?",
+                    message=f"Do you want to unset {self.__name__} '{reference_obj.name}' "
+                    + f"prop named '{print_prop}' of '{dest_value}'?",
                     default=False,
                 ).execute():
                     logging.info(
@@ -409,7 +403,6 @@ class ObjectList:
                 )
             self._accessor[reference_obj.name].refresh()
             logging.info(response)
-            # print(response)
         except spl_context.HTTPError as error:
             logging.error(error)
 
@@ -438,7 +431,7 @@ class ObjectList:
         return True
 
     def _delete(self, name: str, simulate: bool = False):
-        """[summary]
+        """Delete the specified object on the Splunk instance.
 
         Args:
             name (str): Object name that should be deleted.
@@ -553,6 +546,7 @@ class ObjectList:
 
 
 class App(Object):
+    """Splunk App Object."""
 
     OVERVIEW_FIELDS = {"ID": None, "Title": "label", "Version": "version"}
     DETAIL_FIELDS = {
@@ -570,11 +564,13 @@ class App(Object):
 
 
 class Apps(ObjectList):
+    """List of Splunk App Objects."""
 
     SUBTYPE = App
 
     @staticmethod
     def diff(src_client, dest_client) -> DeepDiff:
+        """Detect changes between source & destination Splunk instance."""
         return ObjectList._diff(
             src_client=src_client,
             src_client_accessor=src_client.apps.list(),
@@ -584,6 +580,7 @@ class Apps(ObjectList):
 
 
 class EventType(Object):
+    """Splunk EventType Object."""
 
     OVERVIEW_FIELDS = {
         "Name": None,
@@ -600,11 +597,13 @@ class EventType(Object):
 
 
 class EventTypes(ObjectList):
+    """List of Splunk EventType Objects."""
 
     SUBTYPE = EventType
 
     @staticmethod
     def diff(src_client, dest_client) -> DeepDiff:
+        """Detect changes between source & destination Splunk instance."""
         return ObjectList._diff(
             src_client=src_client,
             src_client_accessor=src_client.event_types.list(),
@@ -614,6 +613,7 @@ class EventTypes(ObjectList):
 
 
 class Index(Object):
+    """Splunk Index Object."""
 
     OVERVIEW_FIELDS = {
         "Name": None,
@@ -635,11 +635,13 @@ class Index(Object):
 
 
 class Indexes(ObjectList):
+    """List of Splunk Index Objects."""
 
     SUBTYPE = Index
 
     @staticmethod
     def diff(src_client, dest_client) -> DeepDiff:
+        """Detect changes between source & destination Splunk instance."""
         return ObjectList._diff(
             src_client=src_client,
             src_client_accessor=src_client.indexes.list(),
@@ -649,6 +651,7 @@ class Indexes(ObjectList):
 
 
 class Input(Object):
+    """Splunk Input Object."""
 
     OVERVIEW_FIELDS = {
         "Name": None,
@@ -662,11 +665,13 @@ class Input(Object):
 
 
 class Inputs(ObjectList):
+    """List of Splunk Input Objects."""
 
     SUBTYPE = Input
 
     @staticmethod
     def diff(src_client, dest_client) -> DeepDiff:
+        """Detect changes between source & destination Splunk instance."""
         return ObjectList._diff(
             src_client=src_client,
             src_client_accessor=src_client.inputs.list(),
@@ -676,6 +681,7 @@ class Inputs(ObjectList):
 
 
 class Role(Object):
+    """Splunk Role Object."""
 
     OVERVIEW_FIELDS = {
         "Name": None,
@@ -703,11 +709,13 @@ class Role(Object):
 
 
 class Roles(ObjectList):
+    """List of Splunk Role Objects."""
 
     SUBTYPE = Role
 
     @staticmethod
     def diff(src_client, dest_client) -> DeepDiff:
+        """Detect changes between source & destination Splunk instance."""
         return ObjectList._diff(
             src_client=src_client,
             src_client_accessor=src_client.roles.list(),
@@ -717,6 +725,7 @@ class Roles(ObjectList):
 
 
 class SavedSearch(Object):
+    """Splunk SavedSearch Object."""
 
     OVERVIEW_FIELDS = {
         "Name": None,
@@ -735,11 +744,13 @@ class SavedSearch(Object):
 
 
 class SavedSearches(ObjectList):
+    """List of Splunk SavedSearch Objects."""
 
     SUBTYPE = SavedSearch
 
     @staticmethod
     def diff(src_client, dest_client) -> DeepDiff:
+        """Detect changes between source & destination Splunk instance."""
         return ObjectList._diff(
             src_client=src_client,
             src_client_accessor=src_client.saved_searches.list(),
@@ -749,6 +760,7 @@ class SavedSearches(ObjectList):
 
 
 class User(Object):
+    """Splunk User Object."""
 
     OVERVIEW_FIELDS = {
         "User": None,
@@ -777,11 +789,13 @@ class User(Object):
 
 
 class Users(ObjectList):
+    """List of Splunk User Objects."""
 
     SUBTYPE = User
 
     @staticmethod
     def diff(src_client, dest_client) -> DeepDiff:
+        """Detect changes between source & destination Splunk instance."""
         return ObjectList._diff(
             src_client=src_client,
             src_client_accessor=src_client.users.list(),
@@ -789,10 +803,10 @@ class Users(ObjectList):
             dest_client_accessor=dest_client.users.list(),
         )
 
-    def _migrate_capabilities(self, reference_obj, prop, simulate: bool = False):
-        prop = prop.replace("capabilities.", "")
-        src_capabilities = reference_obj.capabilities
-        dest_capabilities = self._accessor[reference_obj.name].capabilities
-        missing = [
-            capability for capability in src_capabilities if capability not in dest_capabilities
-        ]
+    # def _migrate_capabilities(self, reference_obj, prop, simulate: bool = False):
+    #     prop = prop.replace("capabilities.", "")
+    #     src_capabilities = reference_obj.capabilities
+    #     dest_capabilities = self._accessor[reference_obj.name].capabilities
+    #     missing = [
+    #         capability for capability in src_capabilities if capability not in dest_capabilities
+    #     ]

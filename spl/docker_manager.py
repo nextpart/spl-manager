@@ -1,4 +1,6 @@
 # -*- coding: utf-8 -*-
+""""Splunk Docker-Container Manager."""
+
 import os
 import tarfile
 from pathlib import Path
@@ -231,10 +233,10 @@ class DockerManager:
             dict: docker client container (re)start response dict.
         """
         seconds_to_wait = 1
-        while container_starting := True:
+        while True:
             self._container = self._get_or_create_container()  # Update container instance
             try:
-                if self._container["Status"] == "Created":
+                if self._container["Status"] == "Created":  # pylint: disable=R1705
                     self._container = self._docker.start(self._container["Id"])
                     self._log.info("Container starting...")
                     return self._container
@@ -315,7 +317,9 @@ class DockerManager:
             os.remove(Path(str(tmp_app) + ".tar"))
             self.fix_app_permissions(app_name=tmp_app.name)
 
-    def download(self, path: Union[Path, str] = Path.cwd(), app: str = None):
+    def download(
+        self, path: Union[Path, str] = Path.cwd(), app: str = None
+    ):  # pylint: disable=R0912
         """Download splunk container instance application to local filesystem.
 
         Args:
@@ -398,33 +402,33 @@ class DockerManager:
         else:
             for app in container_apps:
                 selected_apps.append(app)
-        for app_name in selected_apps:
+        for app in selected_apps:
             execution = self._docker.exec_create(
                 container="splunk",
                 workdir="/opt/splunk/etc/apps",
                 cmd=(
                     "bash -c '"
-                    + f"chown -R splunk. {app_name} ;"
-                    + f"chmod 755 {app_name} ;"
-                    + f"find {app_name} -maxdepth 1 -name 'azure-pipelines.yml'"
+                    + f"chown -R splunk. {app} ;"
+                    + f"chmod 755 {app} ;"
+                    + f"find {app} -maxdepth 1 -name 'azure-pipelines.yml'"
                     + r" -exec rm {} \;  >/dev/null 2>&1 ;"
-                    + f"find {app_name} -maxdepth 1 -name '*.rst'"
+                    + f"find {app} -maxdepth 1 -name '*.rst'"
                     + r" -exec rm {} \;  >/dev/null 2>&1 ;"
-                    + f"find {app_name} -maxdepth 1 -name '.git*'"
+                    + f"find {app} -maxdepth 1 -name '.git*'"
                     + r" -exec rm {} \;  >/dev/null 2>&1 ;"
-                    + f"find {app_name} -maxdepth 1 -name '.pre-commit-config.yaml'"
+                    + f"find {app} -maxdepth 1 -name '.pre-commit-config.yaml'"
                     + r" -exec rm {} \;  >/dev/null 2>&1 ;"
-                    + f"find {app_name} -type d"
+                    + f"find {app} -type d"
                     + r" -exec chmod -R 700 {} \;  >/dev/null 2>&1 ;"
-                    + f"find {app_name} -type f"
+                    + f"find {app} -type f"
                     + r" -exec chmod -R 644 {} \;  >/dev/null 2>&1 ;"
-                    + f"find {app_name}/local {app_name}/default {app_name}/static -type f"
+                    + f"find {app}/local {app}/default {app}/static -type f"
                     + r" -exec chmod 600 {} \; >/dev/null 2>&1 ;"
-                    + f"find {app_name}/bin -type f"
+                    + f"find {app}/bin -type f"
                     + r" -exec chmod 655 {} \;  >/dev/null 2>&1 ;"
-                    + f"find {app_name}/static -type d"
+                    + f"find {app}/static -type d"
                     + r" -exec chmod 710 {} \;  >/dev/null 2>&1 ;"
-                    + f"find {app_name}/static -name app.manifest"
+                    + f"find {app}/static -name app.manifest"
                     + r" -exec chmod 600 {} \;  >/dev/null 2>&1 ;"
                     + "'"
                 ),

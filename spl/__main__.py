@@ -39,7 +39,7 @@ class SplManager:
         src: str = None,
         dest: str = None,
         context=False,
-    ):
+    ):  # pylint: disable=R0913
         """Splunk management object initialization and module declaration.
 
         Args:

@@ -1,22 +1,22 @@
 # -*- coding: utf-8 -*-
+"""Splunk Connection-Adapter.
+
+Let's you list certain properties of a connected Splunk Instance,
+such as Apps, Event_Types, Indexes, Roles, SavedSearches, Users, ...
+"""
 
 from typing import Optional
 
 import splunklib.client as spl_client
 from InquirerPy import inquirer
-from rich import inspect, print  # pylint: disable=W0622
 
 from spl.objects import Apps, EventTypes, Indexes, Inputs, Roles, SavedSearches, Users
 
 TIME_FORMAT = "%d.%m.%Y %H:%M:%S"
 
 
-class ConnectionAdapter:
-    """Splunk API client adaper to use in other modules.
-
-    Raises:
-        ValueError: [description]
-    """
+class ConnectionAdapter:  # pylint: disable=R0902
+    """Splunk API client adaper to use in other modules."""
 
     spl: spl_client.Service
 
@@ -48,42 +48,47 @@ class ConnectionAdapter:
 
     @property
     def roles(self):
+        """Splunk Roles."""
         return Roles(self.client, accessor=self.client.roles, interactive=self._interactive)
 
     @property
     def users(self):
+        """Splunk Users."""
         return Users(self.client, accessor=self.client.users, interactive=self._interactive)
 
     @property
     def apps(self):
+        """Splunk Applications."""
         return Apps(self.client, accessor=self.client.apps, interactive=self._interactive)
 
     @property
     def indexes(self):
+        """Splunk Indexes."""
         return Indexes(self.client, accessor=self.client.indexes, interactive=self._interactive)
 
     @property
     def event_types(self):
+        """Splunk Event_Types."""
         return EventTypes(
             self.client, accessor=self.client.event_types, interactive=self._interactive
         )
 
     @property
     def saved_searches(self):
+        """Splunk SavedSearches."""
         return SavedSearches(
             self.client, accessor=self.client.saved_searches, interactive=self._interactive
         )
 
     @property
     def inputs(self):
+        """Splunk Inputs."""
         return Inputs(
             client=self.client, accessor=self.client.inputs, interactive=self._interactive
         )
 
-    def test(self):
-        return "test"
-
     def restart(self):
+        """Restart the connected Splunk Instance."""
         if self._name in ["localhost", "nxtp-onprem"]:
             self._log.info("Restarting instance...")
             self.client.restart(timeout=360)
@@ -95,20 +100,15 @@ class ConnectionAdapter:
         app: Optional[str] = None,  # "system",
         sharing: Optional[str] = None,  # "system",
         owner: Optional[str] = None,  # "admin",
-    ):
-        """Set the namespace context for splunk interaction.
-
-        # TODO: Add a better description of what this method does.
-        # TODO: Add description to Args & Raises
+    ):  # pylint: disable=R0912
+        """Set the namespace context used during Splunk interaction.
 
         Args:
-            context (bool): Whether or not to ask for context input.
-            app ([type], optional): [description]. Defaults to None.
-            sharing ([type], optional): [description]. Defaults to None.
-            owner ([type], optional): [description]. Defaults to None.
-
-        Raises:
-            ValueError: [description]
+            context (bool): Whether or not to use context
+                (If True, asks for context input).
+            app (str, optional): The app scope to use for context.
+            sharing (str, optional): The sharing scope to use for context.
+            owner (str, optional): The owner scope to use for context.
         """
         if context:
             self._log.info(f"Determining namespace/context for connection '{self._name}'")
@@ -119,7 +119,7 @@ class ConnectionAdapter:
         sharing_list = [None, "-", "global", "system", "app", "user"]
         # APP
         if context and self._interactive and app is None:
-            self.app = inquirer.select(
+            self.app = inquirer.select(  # pylint: disable=W0201
                 message=f"Select an application context for {self._name}:",
                 choices=app_list,
                 default=None,
@@ -127,7 +127,7 @@ class ConnectionAdapter:
         elif app not in app_list:
             raise ValueError(f"Application '{app}' does not exist")
         else:
-            self.app = app
+            self.app = app  # pylint: disable=W0201
         # SHARING
         if context and self._interactive and sharing is None:
             self.sharing = inquirer.select(
@@ -156,10 +156,5 @@ class ConnectionAdapter:
             self.client.namespace["sharing"] = self.sharing
         if self.owner is not None:
             self.client.namespace["owner"] = self.owner
-        # self.client.namespace = spl_context.namespace(
-        #     sharing=self.sharing,
-        #     app=self.app,
-        #     owner=self.owner,
-        # )#
         self._log.info(f"Switched to namespace: {self.client.namespace} for current execution.")
         return self.client.namespace
