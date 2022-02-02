@@ -1,4 +1,9 @@
 # -*- coding: utf-8 -*-
+"""Splunk Application-Manager.
+
+List, Create & Validate/AppInspect Splunk Applications.
+"""
+
 import csv
 import json
 import logging
@@ -73,7 +78,6 @@ class AppsManager:
         apps = []
         logging.getLogger("splunk_appinspect.app").disabled = True
         for path in track(self._paths):
-            # try:
             apps.append(
                 splunk_appinspect.App(
                     location=path,
@@ -81,8 +85,6 @@ class AppsManager:
                     trusted_libs_manager=False,
                 )
             )
-            # except Exception as exc:
-            #     self._log.warning(exc)
         apps.sort(key=lambda x: x.package_id)
         return apps
 
@@ -100,9 +102,7 @@ class AppsManager:
             # table.add_column('Author')
             # table.add_column('Description')
             for app in self._apps:
-                table.add_row(
-                    app.package_id, app.label, app.version
-                )  # , app.author, app.description)
+                table.add_row(app.package_id, app.label, app.version)
             console = Console()
             console.print(table)
         else:
@@ -114,7 +114,7 @@ class AppsManager:
                 csv_writer.writerow(results[0].keys())
                 csv_writer.writerows([result.values() for result in results])
 
-    def validate(self, force=False, cloudvet=None):
+    def validate(self, force: Optional[bool] = False, cloudvet=None):
         """Packaging, validation and vetting of selected apps.
 
         Packaging and local validation/appinspect routine using utility image with
@@ -123,7 +123,7 @@ class AppsManager:
         Args:
             force (bool, optional): Don't ask to rerun routine if result already exists.
                 Defaults to False.
-            cloudvet ([type], optional): Also run the cloud-vetting check via appinspect API.
+            cloudvet (bool, optional): Also run the cloud-vetting check via appinspect API.
                 Defaults to None.
         """
         apps = self._apps
@@ -135,7 +135,6 @@ class AppsManager:
             apps = [app for app in apps if app.name in selected_apps]
         if apps == []:
             return
-        print(cloudvet)
         if cloudvet is None and self._interactive:
             cloudvet = inquirer.confirm(
                 message="Do you want to validate packages via cloud vetting?", default=False
@@ -153,7 +152,7 @@ class AppsManager:
                     dist_path=Path(self._work_dir.parent / "dist", force=force),
                 )
 
-    def run_packaging(self, app_path: Path, dist_path: Path, force=False):
+    def run_packaging(self, app_path: Path, dist_path: Path, force: Optional[bool] = False):
         """Run application preperation, packaging, validation and appinspect via image.
 
         Args:
@@ -204,7 +203,6 @@ class AppsManager:
                             "mode": "rw",
                         },
                     },
-                    # auto_remove=True
                 ),
             )["Id"]
             sleep(5)
@@ -230,7 +228,9 @@ class AppsManager:
         ) as log_file:
             self._log.info(log_file.read())
 
-    def run_cloudvetting(self, app_name: str, dist_path: Path, force=False):
+    def run_cloudvetting(
+        self, app_name: str, dist_path: Path, force: Optional[bool] = False
+    ):  # pylint: disable=R0914
         """Cloud vetting routine via AppInspect API. Can bring different results.
 
         Args:
@@ -331,11 +331,11 @@ class AppsManager:
         """Check if image exists or pull.
 
         Returns:
-            dict: Image properties
+            dict: Image properties.
         """
         for image in self._docker.images():
             tags = image["RepoTags"]
-            # Skip tags check if tags is None
+            # Skip checking tags if tags is None
             if tags is None:
                 continue
             if len(tags) > 0 and self._settings.DOCKER.PACKAGE_IMAGE in tags:
