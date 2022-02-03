@@ -78,6 +78,7 @@ default:
       timeline_viz: { id: "3120", version: 1.6.1 }
       windows_dhcp_ta: { id: "4359", version: 1.2.0 }
   docker:
+    package_image: nextpart/splunk-package:latest
     socket: unix://var/run/docker.sock
     image: splunk/splunk:8.1-debian
     environment:

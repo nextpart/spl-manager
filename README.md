@@ -98,7 +98,7 @@ and probably much more, so pull requests are welcome!
 
 ## Getting Started 🚀
 
-You can download the package from the package feed via `pip install spl-mngmt` or
+You can download the package from the package feed via `pip install spl-manager` or
 install from source with [poetry](https://python-poetry.org/) after cloning the
 repository.
 
@@ -171,9 +171,7 @@ If you wish to get more information about any command within `spl`, you can pass
 
 ## 🤩 Support
 
-[![Support via PayPal](https://cdn.rawgit.com/twolfson/paypal-github-button/1.0.0/dist/button.svg)](https://www.paypal.com/donate/?hosted_button_id=UXNY3UEYKBJ7L)
-
-or send us some crypto:
+[![Support via PayPal](https://img.shields.io/badge/PayPal-00457C?style=for-the-badge&logo=paypal&logoColor=white)](https://www.paypal.com/donate/?hosted_button_id=UXNY3UEYKBJ7L) or send us some crypto:
 
 | Protocol            | Address                                         |
 | ------------------- | ----------------------------------------------- |

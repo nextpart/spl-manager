@@ -12,12 +12,12 @@ from dynaconf import Dynaconf
 from rich import print  # pylint: disable=W0622
 from rich.logging import RichHandler
 
-from spl.apps_manager import AppsManager
-from spl.connection_adapter import ConnectionAdapter
-from spl.docker_manager import DockerManager
-from spl.samples_manager import SamplesManager
-from spl.schemata import CONFIG_SCHEMA
-from spl.sync_manager import SyncManager
+from spl_manager.apps_manager import AppsManager
+from spl_manager.connection_adapter import ConnectionAdapter
+from spl_manager.docker_manager import DockerManager
+from spl_manager.samples_manager import SamplesManager
+from spl_manager.schemata import CONFIG_SCHEMA
+from spl_manager.sync_manager import SyncManager
 
 logFormatter = logging.Formatter("%(asctime)s [%(levelname)-5.5s] | %(message)s")
 rootLogger = logging.getLogger()
@@ -154,9 +154,12 @@ class SplManager:
         return AppsManager(self, path=path, name=name)
 
 
-# CLI Entrypoint:
-if __name__ == "__main__":
+def main():
     try:
         fire.Fire(name="spl", component=SplManager)
     except KeyboardInterrupt:
         print("Bye! 🖖")
+
+# CLI Entrypoint:
+if __name__ == "__main__":
+    main

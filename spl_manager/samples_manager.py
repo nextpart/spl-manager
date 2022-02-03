@@ -11,7 +11,7 @@ import splunklib.results as spl_results
 from InquirerPy import inquirer
 from rich import print  # pytlint: disable=W0622
 
-from spl.connection_adapter import ConnectionAdapter
+from spl_manager.connection_adapter import ConnectionAdapter
 
 
 class SamplesManager:
@@ -49,7 +49,7 @@ class SamplesManager:
             "search_mode": "normal",
         }
 
-        job = connection.spl.jobs.create("search " + sample_props["query"], **search_args)
+        job = connection.client.jobs.create("search " + sample_props["query"], **search_args)
         self._log.debug(f"Created search job on '{connection._name}'.")
         sleep(2)
         while True:

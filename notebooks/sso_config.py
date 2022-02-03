@@ -3,7 +3,7 @@
 
 from rich import print
 
-from spl.__main__ import SplManager
+from spl_manager.__main__ import SplManager
 
 # %%
 cloud = SplManager(interactive=False).manager(conn="nxtp-cloud")

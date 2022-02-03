@@ -3,7 +3,7 @@
 
 from rich import print
 
-from spl.__main__ import SplManager
+from spl_manager.__main__ import SplManager
 
 # %%
 spl = SplManager(src="nxtp-onprem", dest="localhost", interactive=False)

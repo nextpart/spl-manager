@@ -1,4 +1,6 @@
 # -*- coding: utf-8 -*-
+# pylint: disable=R0902,R0903,R0913
+"""Splunk Sync Manager for synchronizing Objects."""
 import logging
 from typing import Tuple
 
@@ -6,8 +8,8 @@ import splunklib.client as spl_client
 from InquirerPy import inquirer
 from rich import print  # pylint: disable=W0622
 
-from spl.connection_adapter import ConnectionAdapter
-from spl.objects import Apps, EventTypes, Indexes, Inputs, Roles, SavedSearches, Users
+from spl_manager.connection_adapter import ConnectionAdapter
+from spl_manager.objects import Apps, EventTypes, Indexes, Inputs, Roles, SavedSearches, Users
 
 
 class SyncManager:
@@ -31,6 +33,7 @@ class SyncManager:
         delete: bool = False,
         simulate: bool = False,
     ):
+        """Synchronize Role Objects."""
         self._DiffHandler(
             parent=self,
             diff=Roles.diff,
@@ -50,6 +53,7 @@ class SyncManager:
         delete: bool = False,
         simulate: bool = False,
     ):
+        """Synchronize User Objects."""
         self._DiffHandler(
             parent=self,
             diff=Users.diff,
@@ -70,6 +74,7 @@ class SyncManager:
         delete: bool = False,
         simulate: bool = False,
     ):
+        """Synchronize Index Objects."""
         self._DiffHandler(
             parent=self,
             diff=Indexes.diff,
@@ -89,6 +94,7 @@ class SyncManager:
         delete: bool = False,
         simulate: bool = False,
     ):
+        """Synchronize App Objects."""
         self._DiffHandler(
             parent=self,
             diff=Apps.diff,
@@ -108,6 +114,7 @@ class SyncManager:
         delete: bool = False,
         simulate: bool = False,
     ):
+        """Synchronize EventType Objects."""
         self._DiffHandler(
             parent=self,
             diff=EventTypes.diff,
@@ -127,6 +134,7 @@ class SyncManager:
         delete: bool = False,
         simulate: bool = False,
     ):
+        """Synchronize SavedSearch Objects."""
         self._DiffHandler(
             parent=self,
             diff=SavedSearches.diff,
@@ -146,6 +154,7 @@ class SyncManager:
         delete: bool = False,
         simulate: bool = False,
     ):
+        """Synchronize Input Objects."""
         self._DiffHandler(
             parent=self,
             diff=Inputs.diff,
@@ -201,6 +210,10 @@ class SyncManager:
             delete: bool = True,
             simulate: bool = simulate,
         ):
+            """Synchronize the differences between src and dest.
+
+            Allows you to create, update or delete Splunk objects.
+            """
             self.simulate = simulate
             self.diff = self._diff_gen(self.src.client, self.dest.client)
             self._log.info(self.diff)
@@ -215,7 +228,7 @@ class SyncManager:
                 self.diff = self._diff_gen(self.src.client, self.dest.client)
 
         def _create(self):
-            """Sync completely missing entities (i.e. User, Index, ...)."""
+            """Synchronize completely missing entities (i.e. User, Index, ...)."""
             if "dictionary_item_removed" in self.diff and "create" in self._sync_actions:
                 items = [
                     item
@@ -242,7 +255,7 @@ class SyncManager:
                     )
 
         def _delete(self):
-            """Sync completely missing entities (i.e. User, Index, ...)."""
+            """Synchronize completely missing entities (i.e. User, Index, ...)."""
             if "dictionary_item_added" in self.diff and "delete" in self._sync_actions:
                 items = [
                     item
@@ -274,14 +287,6 @@ class SyncManager:
                 "type_changes",
             ]:
                 if mode in self.diff:
-                    # items = [
-                    #     (entity_name, sanitized_item)
-                    #     for entity_name, sanitized_item in [
-                    #         self._sanitize_item_item(item) for item in self.diff[mode]
-                    #     ]
-                    #     if sanitized_item != ""
-                    # ]
-                    # for entity_name, sanitized_item in items:
                     for item in self.diff[mode]:
                         (entity_name, sanitized_item) = self._sanitize_item_item(item)
                         if sanitized_item == "":
@@ -301,7 +306,6 @@ class SyncManager:
                             )
                             continue
                         if sanitized_item in self._sync_actions or "*" in self._sync_actions:
-                            # sanitized_item = sanitized_item.replace("content.", "")
                             try:
                                 src_value = None
                                 dest_value = None
@@ -336,17 +340,9 @@ class SyncManager:
         def _sanitize_item_item(item) -> Tuple[str, str]:
             """Remove 'root' and unnecessary brackets aka convert to dot notation.
 
-            Returns entity name and sanitized item as tuple.
+            Returns:
+                Tuple[str,str]: entity name and sanitized item as tuple.
             """
-            # split_item = (
-            #     item.replace("root[", "")
-            #     .replace("][", ".")
-            #     .replace("'", "")
-            #     .replace("]", "")
-            #     .replace("[", "")
-            #     .split(".")
-            # )
-            # return split_item[0], ".".join([item for item in split_item[1:] if not item.isdigit()])
             return (
                 item[: item.index("']")].replace("root['", ""),
                 item[item.index("']") : item.rindex("']")].replace("']['", ".")[1:],

@@ -35,7 +35,7 @@ class AppsManager:
     _paths = []
     _results = {}
 
-    def __init__(self, parent: object, path: Union[Path, str] = Path.cwd(), name: str = None):
+    def __init__(self, parent: object, path: Union[Path, str] = Path.cwd(), name: str = "*"):
         """Local application management module initialization.
 
         Args:

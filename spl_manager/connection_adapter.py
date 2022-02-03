@@ -10,7 +10,7 @@ from typing import Optional
 import splunklib.client as spl_client
 from InquirerPy import inquirer
 
-from spl.objects import Apps, EventTypes, Indexes, Inputs, Roles, SavedSearches, Users
+from spl_manager.objects import Apps, EventTypes, Indexes, Inputs, Roles, SavedSearches, Users
 
 TIME_FORMAT = "%d.%m.%Y %H:%M:%S"
 

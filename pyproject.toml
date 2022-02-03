@@ -14,9 +14,13 @@ style = [
 [tool.poetry]
 authors = ["Nextpart Security Intelligence <info@nextpart.io>"]
 description = ""
-name = "spl"
+name = "spl-manager"
 readme = 'README.md'
 version = "0.1.0"
+
+[tool.poetry.scripts]
+spl = 'spl_manager.__main__:main'
+
 
 [tool.poetry.dependencies]
 Cerberus = "^1.3"
