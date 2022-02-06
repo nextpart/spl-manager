@@ -3,24 +3,15 @@
 build-backend = "poetry.core.masonry.api"
 requires = ["poetry-core>=1.0.0"]
 
-[tool.nitpick]
-cache = "never"
-style = [
-  "https://res.gen.nxtp/files/codestyle/styles/nitpick-generic.toml",
-  "https://res.gen.nxtp/files/codestyle/styles/nitpick-python.toml",
-  "https://res.gen.nxtp/files/codestyle/styles/nitpick-pypackage.toml",
-]
-
 [tool.poetry]
 authors = ["Nextpart Security Intelligence <info@nextpart.io>"]
-description = ""
+description = "A helper for Splunk-related development, maintenance, or migration operations."
 name = "spl-manager"
 readme = 'README.md'
 version = "0.1.0"
 
 [tool.poetry.scripts]
 spl = 'spl_manager.__main__:main'
-
 
 [tool.poetry.dependencies]
 Cerberus = "^1.3"
@@ -36,7 +27,7 @@ splunk-appinspect = "^2.14"
 splunk-sdk = "^1.6"
 
 [tool.poetry.dev-dependencies]
-black = "^21.12b0"
+black = {version = "*", allow-prereleases = true}
 ipykernel = "^6.6"
 pylint = "^2.12"
 tox = "^3.24"
@@ -74,23 +65,3 @@ junit_family = "xunit2"
 minversion = "6.0"
 norecursedirs = ["**/.svn", "**/_build", "**/tmp*", "**/.tox", "**/venv", "**/docs", "**/junit", "**/tests"]
 testpaths = ["tests"]
-
-[tool.mypy]
-allow_redefinition = true
-check_untyped_defs = true
-disallow_any_generics = false
-disallow_incomplete_defs = false
-disallow_subclassing_any = true
-disallow_untyped_calls = false
-ignore_missing_imports = false
-install_types = true
-local_partial_types = true
-namespace_packages = true
-no_implicit_optional = false
-non_interactive = true
-show_error_codes = true
-strict_equality = true
-warn_redundant_casts = true
-warn_return_any = true
-warn_unused_configs = true
-warn_unused_ignores = true

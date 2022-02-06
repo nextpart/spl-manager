@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """SPL management schemas."""
 # %%
 CONNECTION_CONFIG_SCHEMA = {

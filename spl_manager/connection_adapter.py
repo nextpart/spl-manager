@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Splunk Connection-Adapter.
 
 Let's you list certain properties of a connected Splunk Instance,

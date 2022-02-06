@@ -1,0 +1,6 @@
+---
+collections: {}
+roles:
+  - andrewrothstein.starship
+  - gantsign.oh-my-zsh
+  - staticdev.python_developer

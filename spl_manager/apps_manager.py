@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Splunk Application-Manager.
 
 List, Create & Validate/AppInspect Splunk Applications.

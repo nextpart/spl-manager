@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # pylint: disable=R0903
 """Manager for syncing differences of two instances."""
 import logging

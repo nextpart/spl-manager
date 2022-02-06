@@ -1,0 +1,84 @@
+---
+- name: Create user
+  hosts: localhost
+  become: true
+  become_user: root
+  vars:
+    - zsh_fzf_version: 0.17.4
+  roles:
+    - role: andrewrothstein.starship
+    - role: gantsign.oh-my-zsh
+      users:
+        - username: "{{ username }}"
+          oh_my_zsh:
+            plugins:
+              - ansible
+              - git
+              - docker
+              - poetry
+    - role: staticdev.python_developer
+      vars:
+        pyenv_global:
+          - "3.9.9"
+        pyenv_python_versions:
+          - "3.9.9"
+
+  tasks:
+    - name: Display the config
+      debug:
+        msg: |
+          Version:      {{ ansible_version.full }}
+          Hostname:     {{ ansible_hostname }}
+          OS:           {{ ansible_os_family }}
+          Distribution: {{ ansible_distribution }}
+
+    - name: Activate starship for ZSH
+      ansible.builtin.lineinfile:
+        path: /home/{{ username }}/.zshrc
+        regexp: "starship"
+        line: eval "$(starship init zsh)"
+
+    - name: Activate starship for BASH
+      ansible.builtin.lineinfile:
+        path: /home/{{ username }}/.bashrc
+        regexp: "starship"
+        line: eval "$(starship init bash)"
+
+    - name: Install fuzzy find
+      block:
+        - name: Download fzf
+          git:
+            repo: "https://github.com/junegunn/fzf.git"
+            dest: "/home/{{ username }}/.fzf"
+            version: "{{ zsh_fzf_version }}"
+
+        - name: Install fzf
+          become_user: "{{ username }}"
+          command: "/home/{{ username }}/.fzf/install --all"
+
+        - name: Set ~/.fzf.zsh init permissions
+          file:
+            dest: "/home/{{ username }}/.fzf.zsh"
+            state: file
+            owner: "{{ username }}"
+            group: "{{ username }}"
+            mode: 0755
+
+        - name: Set ~/.fzf.bash init permissions
+          file:
+            dest: "/home/{{ username }}/.fzf.bash"
+            state: file
+            owner: "{{ username }}"
+            group: "{{ username }}"
+            mode: 0755
+
+    - name: Set ZSH as default shell
+      become: true
+      user:
+        name: "{{ username }}"
+        shell: "/bin/zsh"
+
+    - name: Install pre-commit python package
+      pip:
+        name:
+          - pre-commit

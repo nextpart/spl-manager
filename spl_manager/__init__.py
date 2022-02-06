@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Splunk Management Utility.
 
 The library ``nextpart-splunk`` aka ``spl`` is a abstraction for splunk related

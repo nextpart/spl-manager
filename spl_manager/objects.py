@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # pylint: disable=R0903,R0912,R0913
 """Splunk object abstractions."""
 

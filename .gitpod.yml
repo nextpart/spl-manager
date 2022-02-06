@@ -1,0 +1,36 @@
+github:
+  prebuilds:
+    master: true # enable for the default branch
+    branches: true # enable for all branches in this repo
+    pullRequests: true # enable for pull requests coming from this rep
+    pullRequestsFromForks: false # enable for pull requests coming from forks
+    addCheck: false # add a check to pull requests
+    addComment: false # add a "Review in Gitpod" button as a comment to pull requests
+    addBadge: true # add a "Review in Gitpod" button to the pull request's description
+
+image:
+  file: .devcontainer/gitpod.Dockerfile
+  context: ./.devcontainer
+checkoutLocation: "gitpod-experiment"
+workspaceLocation: "gitpod-experiment"
+tasks:
+  - before: |
+      ansible-galaxy role install -r ./.devcontainer/ansible/roles/requirements.yml
+      ansible-playbook -c localhost ./.devcontainer/ansible/playbooks/setup.yml -e username=gitpod
+      poetry install -nvV
+
+    init: |
+      pre-commit install
+
+    command: |
+      zsh ;
+      echo "Welcome to the pre-configured development environment! ✌️"
+
+vscode:
+  extensions:
+    - redhat.ansible
+    - ms-azuretools.vscode-docker
+    - mhutchie.git-graph
+    - eamodio.gitlens
+    - ms-python.python
+    - ms-python.vscode-pylance

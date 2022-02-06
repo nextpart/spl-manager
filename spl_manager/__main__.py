@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 """Splunk Development and Maintenance Operations Manager."""
 
 import logging
@@ -159,6 +157,7 @@ def main():
         fire.Fire(name="spl", component=SplManager)
     except KeyboardInterrupt:
         print("Bye! 🖖")
+
 
 # CLI Entrypoint:
 if __name__ == "__main__":

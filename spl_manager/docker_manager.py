@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """"Splunk Docker-Container Manager."""
 
 import os

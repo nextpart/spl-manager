@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Splunk Samples Manager."""
 
 import _thread

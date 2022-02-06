@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Sync props & transforms for certain apps
 
 # Determine props & transforms from Syslog-Config TA on OnPrem

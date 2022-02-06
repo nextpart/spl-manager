@@ -10,14 +10,16 @@
 repos:
   # Common stuff and checks
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.0.1
+    rev: v4.1.0
     hooks:
+      - id: check-added-large-files
+        args: [--maxkb=800]
+      - id: detect-private-key
       - id: check-ast # Simply check whether the files parse as valid python.
       - id: check-case-conflict # Check for files that would conflict in case-insensitive filesystems
       - id: check-docstring-first # Checks a common error of defining a docstring after code.
       - id: check-merge-conflict # Check for files that contain merge conflict strings.
       - id: debug-statements # Check for debugger imports and py37+ `breakpoint()` calls.
-      - id: fix-encoding-pragma # Add "# -*- coding: utf-8 -*-"" to the top of python files
       - id: trailing-whitespace # This hook trims trailing whitespace.
       - id: end-of-file-fixer # Ensures that a file is either empty, or ends with one newline.
 
@@ -35,22 +37,14 @@ repos:
           - --ignore-init-module-imports
 
   - repo: https://github.com/pycqa/isort
-    rev: 5.9.3
+    rev: 5.10.1
     hooks:
       - id: isort
         name: isort (python)
         args: [--settings-file, pyproject.toml]
-      - id: isort
-        name: isort (cython)
-        types: [cython]
-        args: [--settings-file, pyproject.toml]
-      - id: isort
-        name: isort (pyi)
-        types: [pyi]
-        args: [--settings-file, pyproject.toml]
 
   - repo: https://github.com/psf/black
-    rev: 21.9b0
+    rev: 21.12b0
     hooks:
       - id: black
         language_version: python3
@@ -60,7 +54,7 @@ repos:
     rev: v1.11.0
     hooks:
       - id: blacken-docs
-        additional_dependencies: [black==21.7b0]
+        additional_dependencies: [black==21.12b0]
         exclude: ^.github/
 
   - repo: https://github.com/kynan/nbstripout
@@ -83,27 +77,7 @@ repos:
         files: ^(ChangeLog|doc/(.*/)*.*\.rst)
 
   - repo: https://github.com/pre-commit/mirrors-prettier
-    rev: v2.4.1
+    rev: v2.5.1
     hooks:
       - id: prettier
         args: [--prose-wrap=always, --print-width=88]
-
-  - repo: https://github.com/Lucas-C/pre-commit-hooks-safety
-    rev: v1.2.2
-    hooks:
-      - id: python-safety-dependencies-check
-        args: [
-            # Ignore 41002:
-            # > coverage, installed 5.5, affected <6.0b1, id 41002:
-            # > Coverage 6.0b1 starts to use a modern hash algorithm (sha256)
-            # > when fingerprinting for high-security environments.
-            # Coverage is a transitive, dev-only dependency of pytest-cov that
-            # cannot easily be updated on its own, especially without adding it
-            # as a direct dependency of the project.
-            "--ignore=41002",
-          ]
-
-  - repo: https://github.com/asottile/pyupgrade
-    rev: v2.26.0
-    hooks:
-      - id: pyupgrade
