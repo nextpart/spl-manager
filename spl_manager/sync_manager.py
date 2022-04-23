@@ -174,7 +174,7 @@ class SyncManager:
         delete: bool = False,
         simulate: bool = False,
     ):
-
+        """Synchronize generic configuration objects."""
         print(f"{conf=}")
 
         for stanza in self.src.client.confs[conf].list():

@@ -153,6 +153,7 @@ class SplManager:
 
 
 def main():
+    """Default execution CLI interface."""
     try:
         fire.Fire(name="spl", component=SplManager)
     except KeyboardInterrupt:

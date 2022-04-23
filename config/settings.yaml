@@ -88,8 +88,7 @@ default:
       SPLUNK_PASSWORD: mySplunkDevPw
       SPLUNK_CMD_1: "restart"
       PATH: $PATH:/opt/splunk/bin
-      SPLUNK_CMD:
-        "add licenses -auth admin:${SPLUNK_PASSWORD} /hack/splunk/licenses/*.lic || true"
+      SPLUNK_CMD: "add licenses -auth admin:${SPLUNK_PASSWORD} /hack/splunk/licenses/*.lic || true"
   apps:
     exclude:
       - 075-cloudworks

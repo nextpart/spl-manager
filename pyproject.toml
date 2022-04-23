@@ -8,7 +8,7 @@ authors = ["Nextpart Security Intelligence <info@nextpart.io>"]
 description = "A helper for Splunk-related development, maintenance, or migration operations."
 name = "spl-manager"
 readme = 'README.md'
-version = "0.1.1"
+version = "0.1.2"
 
 [tool.poetry.scripts]
 spl = 'spl_manager.__main__:main'
