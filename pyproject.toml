@@ -22,7 +22,7 @@ fire = "^0.4"
 inquirerpy = "^0.3"
 python = "^3.8"
 requests-toolbelt = "^0.9"
-rich = "^11.0"
+rich = ">=11,<13"
 splunk-appinspect = "^2.14"
 splunk-sdk = "^1.6"
 
