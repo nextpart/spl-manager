@@ -30,7 +30,7 @@ splunk-sdk = "^1.6"
 black = {version = "*", allow-prereleases = true}
 ipykernel = "^6.6"
 pylint = "^2.12"
-tox = "^3.24"
+tox = "^3.25"
 
 [tool.black]
 include = "\\.pyi?$"
