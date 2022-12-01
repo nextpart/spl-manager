@@ -23,7 +23,7 @@ fire = "0.4.*"
 inquirerpy = "0.3.*"
 requests-toolbelt = "0.10.*"
 rich = "12.6.*"
-splunk-appinspect = "2.27.*"
+splunk-appinspect = ">=2.27,<2.30"
 splunk-sdk = "1.7.*"
 
 
