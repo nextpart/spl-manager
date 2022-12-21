@@ -377,7 +377,26 @@ class DockerManager:
                     file_handle.write(chunk)
             self._log.debug(f"Wrote download content for {tmp_app} to local file")
             with tarfile.open(str(path + "/" + tmp_app) + ".tar", mode="r") as tar:
-                tar.extractall(path)
+                def is_within_directory(directory, target):
+                    
+                    abs_directory = os.path.abspath(directory)
+                    abs_target = os.path.abspath(target)
+                
+                    prefix = os.path.commonprefix([abs_directory, abs_target])
+                    
+                    return prefix == abs_directory
+                
+                def safe_extract(tar, path=".", members=None, *, numeric_owner=False):
+                
+                    for member in tar.getmembers():
+                        member_path = os.path.join(path, member.name)
+                        if not is_within_directory(path, member_path):
+                            raise Exception("Attempted Path Traversal in Tar File")
+                
+                    tar.extractall(path, members, numeric_owner=numeric_owner) 
+                    
+                
+                safe_extract(tar, path)
             self._log.debug("Extracted downloaded artifact for {tmp_app}.")
             os.remove(Path(str(path + "/" + tmp_app) + ".tar"))
             self._log.debug("Removed downloaded archive {tmp_app}.tar after extraction.")
