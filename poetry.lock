@@ -1041,7 +1041,7 @@ python-versions = ">=3.6"
 
 [[package]]
 name = "splunk-appinspect"
-version = "2.27.0"
+version = "2.30.0"
 description = "Automatic validation checks for Splunk Apps"
 category = "main"
 optional = false
@@ -1254,7 +1254,7 @@ testing = ["flake8 (<5)", "func-timeout", "jaraco.functools", "jaraco.itertools"
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.8"
-content-hash = "f595d24653e7848515acba58a099a47ffe397d645b05d02679961845127cb48b"
+content-hash = "eb4d87c690ce66a6ace14085ea841f52410e1def51cf58a8cb38130844708a9d"
 
 [metadata.files]
 appdirs = [
@@ -2083,7 +2083,7 @@ soupsieve = [
     {file = "soupsieve-2.3.2.post1.tar.gz", hash = "sha256:fc53893b3da2c33de295667a0e19f078c14bf86544af307354de5fcf12a3f30d"},
 ]
 splunk-appinspect = [
-    {file = "splunk-appinspect-2.27.0.tar.gz", hash = "sha256:3ce720f321da31a162d979c377ef70178555a803ba6c1a1fefc95fe1bae8ac62"},
+    {file = "splunk-appinspect-2.30.0.tar.gz", hash = "sha256:45009a0db5636e806c9a1ebed146a5660bd68fb7bcdf7c7106f3cb7076239096"},
 ]
 splunk-sdk = [
     {file = "splunk-sdk-1.7.2.tar.gz", hash = "sha256:36d27f83e7cc8309be6e3b92e46c547caea566b0c006238025073843e586e5a8"},
