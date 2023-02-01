@@ -22,7 +22,7 @@ dynaconf = "3.1.*"
 fire = "0.4.*"
 inquirerpy = "0.3.*"
 requests-toolbelt = "0.10.*"
-rich = "12.6.*"
+rich = ">=12.6,<13.4"
 splunk-appinspect = "2.27.*"
 splunk-sdk = "1.7.*"
 
