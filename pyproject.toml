@@ -30,7 +30,7 @@ splunk-sdk = "1.7.*"
 [tool.poetry.group.dev.dependencies]
 black = {version = "*", allow-prereleases = true}
 ipykernel = "6.16.*"
-pylint = "2.15.*"
+pylint = ">=2.15,<2.17"
 tox = "3.26.*"
 pre-commit = "^2.20.0"
 
